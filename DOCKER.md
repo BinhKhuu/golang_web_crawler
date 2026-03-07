@@ -62,8 +62,9 @@ docker compose down -v
 # Connecting to Services
 
 ### PostgreSQL
+connect to PostgreSQL
 ``` bash
-docker compose exec postgres psql -U myuser -d mydb
+psql postgres://myuser:mypassword@localhost:5433/jobs_webcrawler
 ```
 
 ### Redis
@@ -79,3 +80,23 @@ To use it:
 ``` bash
 docker compose -f infra/docker-compose.yml up 
 ```
+
+
+# Debug / Trouble shooting
+
+## Can't connect to PostgreSQL
+
+check if another process is listening to the port 5433
+
+```
+lsof -i :5433
+```
+
+You’ll see something like:
+
+    postgres → your local instance is using the port
+
+    docker-proxy or com.docker.backend → your Docker instance is using the port
+
+This tells you exactly which server your psql command is hitting.
+Default port is 5432 this project deliberarly uses 5433 to avoid clashes

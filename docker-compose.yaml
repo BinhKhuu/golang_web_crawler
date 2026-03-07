@@ -6,11 +6,11 @@ services:
     environment:
       POSTGRES_USER: myuser
       POSTGRES_PASSWORD: mypassword
-      POSTGRES_DB: mydb
+      POSTGRES_DB: jobs_webcrawler
     volumes:
       - postgres_data:/var/lib/postgresql/18/main
     ports: 
-      - "5432:5432"
+      - "5433:5432"
 
   redis:
     image: redis:8.6

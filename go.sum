@@ -1,2 +1,6 @@
+github.com/golang-migrate/migrate/v4 v4.19.1 h1:OCyb44lFuQfYXYLx1SCxPZQGU7mcaZ7gH9yH4jSFbBA=
+github.com/golang-migrate/migrate/v4 v4.19.1/go.mod h1:CTcgfjxhaUtsLipnLoQRWCrjYXycRz/g5+RWDuYgPrE=
+github.com/lib/pq v1.11.2 h1:x6gxUeu39V0BHZiugWe8LXZYZ+Utk7hSJGThs8sdzfs=
+github.com/lib/pq v1.11.2/go.mod h1:/p+8NSbOcwzAEI7wiMXFlgydTwcgTr3OSKMsD2BitpA=
 github.com/lpernett/godotenv v0.0.0-20230527005122-0de1d4c5ef5e h1:6b4YTtccT1y/3eSsDCVhB6boPPCh5bQwP1Pa863yH28=
 github.com/lpernett/godotenv v0.0.0-20230527005122-0de1d4c5ef5e/go.mod h1:K+inF/XYdmRn4sSP3IU4EM3KcOdGVJUJqZPmrQSxjGo=
