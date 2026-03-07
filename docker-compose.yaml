@@ -1,0 +1,27 @@
+version: "1.0"
+
+services:
+  postgres:
+    image: postgres:18.0
+    environment:
+      POSTGRES_USER: myuser
+      POSTGRES_PASSWORD: mypassword
+      POSTGRES_DB: mydb
+    volumes:
+      - postgres_data:/var/lib/postgresql/18/main
+    ports: 
+      - "5432:5432"
+
+  redis:
+    image: redis:8.6
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+
+volumes:
+  postgres_data:
+  redis_data:
+
+
