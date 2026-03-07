@@ -49,7 +49,6 @@ migrate -path infra/migrations/scripts \
   -database "postgres://myuser:mypassword@localhost:5433/jobs_webcrawler?sslmode=disable" \
   up
 ```
-
 If everything is correct, you’ll see output confirming the migration was applied. The schema version is tracked inside the database so future migrations apply in order.
 
 ---
@@ -70,6 +69,31 @@ err = m.Up()
 if err != nil && err != migrate.ErrNoChange {
     log.Fatal(err)
 }
+```
+
+## .env credentials
+In the .env file add
+
+```
+DB_USER=myuser
+DB_PASSWORD=mypassword
+DB_HOST=localhost
+DB_PORT=5433
+DB_NAME=jobs_webcrawler
+DB_SSLMODE=disable
+```
+
+export the env values
+
+``` sh
+$(grep -v '^#' .env | xargs) 
+```
+
+run migration command
+``` sh
+migrate -path infra/migrations/scripts \
+    -database "postgres://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSLMODE}" \
+    up
 ```
 
 ## Dirty Migrations

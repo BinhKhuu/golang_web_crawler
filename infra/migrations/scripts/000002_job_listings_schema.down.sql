@@ -1,0 +1,1 @@
+drop job_listings;

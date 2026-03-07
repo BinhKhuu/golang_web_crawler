@@ -1,0 +1,20 @@
+CREATE TABLE job_listings (
+    id SERIAL PRIMARY KEY,
+    title TEXT NOT NULL,
+    company TEXT,
+    location TEXT,
+    remote_flag BOOLEAN DEFAULT FALSE,
+    salary_min NUMERIC,
+    salary_max NUMERIC,
+    currency TEXT,
+    description_html TEXT,
+    description_text TEXT,
+    posted_date DATE,
+    expires_at DATE,
+    source TEXT NOT NULL,
+    source_id TEXT,
+    url TEXT NOT NULL,
+    tags TEXT[],
+    raw_json JSONB,
+    crawl_timestamp TIMESTAMP NOT NULL DEFAULT NOW()
+);
