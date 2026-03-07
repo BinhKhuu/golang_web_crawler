@@ -1,0 +1,77 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+golangwebcrawler
+
+# Go build artifacts
+/bin/
+/dist/
+*.out
+*.test
+*.bench
+
+# Go workspace
+go.work
+go.work.sum
+
+# Dependency directories
+vendor/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+ehthumbs.db
+
+# React / Node
+ui/node_modules/
+ui/build/
+ui/dist/
+ui/.next/
+ui/out/
+ui/.env
+ui/.env.local
+ui/.env.development.local
+ui/.env.test.local
+ui/.env.production.local
+ui/npm-debug.log*
+ui/yarn-debug.log*
+ui/yarn-error.log*
+ui/.pnp
+ui/.pnp.js
+ui/coverage/
+
+# Search / Elasticsearch
+search/indexer/*.log
+search/data/
+
+# Docker
+infra/.env
+
+# Logs
+*.log
+logs/
+
+# Database / migrations artifacts
+*.db
+*.sqlite
+
+# Test coverage
+coverage.out
+coverage.html
