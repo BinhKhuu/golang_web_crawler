@@ -3,6 +3,7 @@ package fetcher
 import (
 	"golangwebcrawler/cmd/crawler/internal/crawler"
 	"io"
+	"log"
 	"net/http"
 )
 
@@ -23,7 +24,13 @@ func (f *HTTPFetcher) Fetch(url string) (crawler.FetchResult, error) {
 	if err != nil {
 		return crawler.FetchResult{URL: url, Err: err}, err
 	}
-	defer resp.Body.Close()
+
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil && err == nil {
+			// log error don't want to override original error if it exists
+			log.Printf("error closing response body for URL %s: %v", url, closeErr)
+		}
+	}()
 
 	body, _ := io.ReadAll(resp.Body)
 	return crawler.FetchResult{
