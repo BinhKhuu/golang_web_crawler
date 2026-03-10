@@ -1,7 +1,7 @@
 package fetcher
 
 import (
-	"golangwebcrawler/cmd/crawler/internal/crawler"
+	"golangwebcrawler/cmd/crawler/internal/models"
 	"io"
 	"log"
 	"net/http"
@@ -19,10 +19,10 @@ func NewHTTPFetcher(client HTTPClient) *HTTPFetcher {
 	return &HTTPFetcher{client: client}
 }
 
-func (f *HTTPFetcher) Fetch(url string) (crawler.FetchResult, error) {
+func (f *HTTPFetcher) Fetch(url string) (models.FetchResult, error) {
 	resp, err := f.client.Get(url)
 	if err != nil {
-		return crawler.FetchResult{URL: url, Err: err}, err
+		return models.FetchResult{URL: url, Err: err}, err
 	}
 
 	defer func() {
@@ -33,7 +33,7 @@ func (f *HTTPFetcher) Fetch(url string) (crawler.FetchResult, error) {
 	}()
 
 	body, _ := io.ReadAll(resp.Body)
-	return crawler.FetchResult{
+	return models.FetchResult{
 		URL:        url,
 		StatusCode: resp.StatusCode,
 		Body:       body,

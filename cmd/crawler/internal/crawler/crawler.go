@@ -1,16 +1,13 @@
 package crawler
 
-import "sync"
-
-type FetchResult struct {
-	URL        string
-	StatusCode int
-	Body       []byte
-	Err        error
-}
+import (
+	"golangwebcrawler/cmd/crawler/internal/models"
+	"log"
+	"sync"
+)
 
 type Fetcher interface {
-	Fetch(url string) (FetchResult, error)
+	Fetch(url string) (models.FetchResult, error)
 }
 
 type CrawlerState struct {
@@ -19,30 +16,52 @@ type CrawlerState struct {
 }
 
 type Crawler interface {
-	Crawl(startUrl string, fetcher Fetcher) ([]string, error)
+	CrawlAsync(wg *sync.WaitGroup, startUrl string, fetcher Fetcher, parser Parser) error
 	IsNavigated(url string) bool
 	MarkVisited(url string)
+}
+
+type Parser interface {
+	ParseLinks(body []byte) ([]string, error)
 }
 
 // Compile-time assertion to ensure CrawlerState implements Crawler interface
 var _ Crawler = (*CrawlerState)(nil)
 
-func (c *CrawlerState) Crawl(startUrl string, fetcher Fetcher) ([]string, error) {
+func (c *CrawlerState) CrawlAsync(wg *sync.WaitGroup, startUrl string, fetcher Fetcher, parser Parser) error {
+	defer wg.Done()
 	c.Lock.Lock()
 	if c.Visited == nil {
 		c.Visited = make(map[string]bool)
+	}
+	if c.Visited[startUrl] {
+		c.Lock.Unlock()
+		return nil
 	}
 	c.Visited[startUrl] = true
 	c.Lock.Unlock()
 
 	result, err := fetcher.Fetch(startUrl)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	// todo extract links from result.Body and crawl them recursively
+	links, err := parser.ParseLinks(result.Body)
+	if err != nil {
+		return err
+	}
 
-	return []string{result.URL}, nil
+	for _, link := range links {
+		wg.Add(1)
+		go func(url string) {
+			if err := c.CrawlAsync(wg, url, fetcher, parser); err != nil {
+				log.Printf("error crawling URL %s: %v", url, err)
+			}
+		}(link)
+	}
+
+	// todo store results in some way, maybe in a channel or a shared data structure with proper synchronization
+	return nil
 }
 
 func (c *CrawlerState) IsNavigated(url string) bool {

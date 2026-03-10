@@ -2,9 +2,38 @@ package crawler
 
 import (
 	"fmt"
+	"golangwebcrawler/cmd/crawler/internal/models"
 	"sync"
 	"testing"
 )
+
+// Compile-time assertions
+var _ Fetcher = (*MockFetchResults)(nil)
+var _ Parser = (*MockParserResults)(nil)
+
+type MockFetchResults struct {
+	URL        string
+	StatusCode int
+	Body       []byte
+	Err        error
+}
+
+func (m *MockFetchResults) Fetch(url string) (models.FetchResult, error) {
+	return models.FetchResult{
+		URL:        m.URL,
+		StatusCode: m.StatusCode,
+		Body:       m.Body,
+		Err:        m.Err,
+	}, m.Err
+}
+
+type MockParserResults struct {
+	Links []string
+}
+
+func (m *MockParserResults) ParseLinks(body []byte) ([]string, error) {
+	return m.Links, nil
+}
 
 func TestIsNavigated(t *testing.T) {
 	c := NewCrawler()
@@ -68,4 +97,29 @@ func Test_VisitedIsThreadSafe(t *testing.T) {
 
 	// concurrent map writes would cause a panic, so if we got here, it means the method is thread-safe. Now we check the results.
 	// Only one goroutine should see false (not navigated yet)
+}
+
+func createMockFetchResults(url string, statusCode int, body []byte, err error) *MockFetchResults {
+	return &MockFetchResults{
+		URL:        url,
+		StatusCode: statusCode,
+		Body:       body,
+		Err:        err,
+	}
+}
+
+func createMockParseResults(links []string) *MockParserResults {
+	return &MockParserResults{
+		Links: links,
+	}
+}
+
+func Test_CrawlAsunc(t *testing.T) {
+	// todo implement test for CrawlAsync, maybe using a mock fetcher that returns predefined results and checking if the crawler correctly marks URLs as visited and handles errors
+	mockFetcher := createMockFetchResults("https://example.com", 200, []byte("mock body"), nil)
+	mockParser := createMockParseResults([]string{"https://example.com/about", "https://example.com/contact"})
+	c := NewCrawler()
+	c.CrawlAsync(&sync.WaitGroup{}, "https://example.com", mockFetcher, mockParser)
+
+	// todo assert on crawler state, maybe check if the URL is marked as visited and if the fetcher was called with the correct URL
 }
