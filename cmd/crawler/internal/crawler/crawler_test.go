@@ -35,6 +35,15 @@ func (m *MockParserResults) ParseLinks(body []byte) ([]string, error) {
 	return m.Links, nil
 }
 
+type MockStorageService struct {
+	Stored []models.RawData
+}
+
+func (m *MockStorageService) Store(result models.RawData) error {
+	m.Stored = append(m.Stored, result)
+	return nil
+}
+
 func TestIsNavigated(t *testing.T) {
 	c := NewCrawler()
 	c.MarkVisited("https://example.com")
@@ -114,12 +123,31 @@ func createMockParseResults(links []string) *MockParserResults {
 	}
 }
 
-func Test_CrawlAsunc(t *testing.T) {
+func createMockStoreageService() *MockStorageService {
+	return &MockStorageService{
+		Stored: []models.RawData{},
+	}
+}
+
+func Test_CrawlAsync(t *testing.T) {
 	// todo implement test for CrawlAsync, maybe using a mock fetcher that returns predefined results and checking if the crawler correctly marks URLs as visited and handles errors
 	mockFetcher := createMockFetchResults("https://example.com", 200, []byte("mock body"), nil)
 	mockParser := createMockParseResults([]string{"https://example.com/about", "https://example.com/contact"})
+	mockStorage := createMockStoreageService()
 	c := NewCrawler()
-	c.CrawlAsync(&sync.WaitGroup{}, "https://example.com", mockFetcher, mockParser)
 
-	// todo assert on crawler state, maybe check if the URL is marked as visited and if the fetcher was called with the correct URL
+	var wg sync.WaitGroup
+	wg.Add(1)
+	err := c.CrawlAsync(&wg, "https://example.com", mockFetcher, mockParser, mockStorage)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	wg.Wait()
+
+	if len(mockStorage.Stored) == 0 {
+		t.Error("expected storage to have at least one result")
+	}
+	if mockStorage.Stored[0].URL != "https://example.com" {
+		t.Errorf("unexpected stored URL: %s", mockStorage.Stored[0].URL)
+	}
 }

@@ -16,7 +16,7 @@ type CrawlerState struct {
 }
 
 type Crawler interface {
-	CrawlAsync(wg *sync.WaitGroup, startUrl string, fetcher Fetcher, parser Parser) error
+	CrawlAsync(wg *sync.WaitGroup, startUrl string, fetcher Fetcher, parser Parser, storage StorageService) error
 	IsNavigated(url string) bool
 	MarkVisited(url string)
 }
@@ -25,10 +25,15 @@ type Parser interface {
 	ParseLinks(body []byte) ([]string, error)
 }
 
+// StorageService defines how crawl results are persisted
+type StorageService interface {
+	Store(result models.RawData) error
+}
+
 // Compile-time assertion to ensure CrawlerState implements Crawler interface
 var _ Crawler = (*CrawlerState)(nil)
 
-func (c *CrawlerState) CrawlAsync(wg *sync.WaitGroup, startUrl string, fetcher Fetcher, parser Parser) error {
+func (c *CrawlerState) CrawlAsync(wg *sync.WaitGroup, startUrl string, fetcher Fetcher, parser Parser, storage StorageService) error {
 	defer wg.Done()
 	c.Lock.Lock()
 	if c.Visited == nil {
@@ -41,26 +46,39 @@ func (c *CrawlerState) CrawlAsync(wg *sync.WaitGroup, startUrl string, fetcher F
 	c.Visited[startUrl] = true
 	c.Lock.Unlock()
 
-	result, err := fetcher.Fetch(startUrl)
+	fetchResult, err := fetcher.Fetch(startUrl)
 	if err != nil {
 		return err
 	}
 
-	links, err := parser.ParseLinks(result.Body)
+	links, err := parser.ParseLinks(fetchResult.Body)
 	if err != nil {
 		return err
+	}
+
+	// todo  this should be storage data model not crawl result datamodel
+	// todo parser should attempt to clean up the raw_content? or should that be a seperate process not related to crawl
+	if storage != nil {
+		crawlResult := models.RawData{
+			URL:         startUrl,
+			ContentType: "", // This can be set based on fetchResult if needed
+			Raw_content: string(fetchResult.Body),
+			Fetched_at:  "", // This can be set to current timestamp if needed
+		}
+		if err := storage.Store(crawlResult); err != nil {
+			log.Printf("error storing result for URL %s: %v", startUrl, err)
+		}
 	}
 
 	for _, link := range links {
 		wg.Add(1)
 		go func(url string) {
-			if err := c.CrawlAsync(wg, url, fetcher, parser); err != nil {
+			if err := c.CrawlAsync(wg, url, fetcher, parser, storage); err != nil {
 				log.Printf("error crawling URL %s: %v", url, err)
 			}
 		}(link)
 	}
 
-	// todo store results in some way, maybe in a channel or a shared data structure with proper synchronization
 	return nil
 }
 

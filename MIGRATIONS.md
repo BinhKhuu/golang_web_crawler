@@ -149,3 +149,10 @@ This tells migrate:
 
 This is the correct way to fix a dirty migration in production because it preserves data and ensures the schema and migration history stay aligned.
 
+#### Migration downs
+migrate down by default only steps down 1 migration at a time.
+
+migrate ... down → rolls back 1 migration (your current version)
+migrate ... down 2 → rolls back 2 migrations
+migrate ... drop → drops everything (dangerous, no steps)
+So if you're on version 000001, running down will only execute 000001_init_schema.down.sql. A 000002 down would only run if you were on version 000002 or passed a steps argument that covers it.
