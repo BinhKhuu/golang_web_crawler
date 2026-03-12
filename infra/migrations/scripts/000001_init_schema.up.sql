@@ -1,6 +1,6 @@
 CREATE TABLE raw_data (
     id SERIAL PRIMARY KEY,
-    url TEXT NOT NULL,
+    url TEXT NOT NULL UNIQUE,
     content_type TEXT,
     raw_content TEXT NOT NULL,
     fetched_at TIMESTAMP NOT NULL DEFAULT NOW()

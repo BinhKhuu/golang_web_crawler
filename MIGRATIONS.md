@@ -149,6 +149,27 @@ This tells migrate:
 
 This is the correct way to fix a dirty migration in production because it preserves data and ensures the schema and migration history stay aligned.
 
+#### Run migrations in order 
+Migrations are designed to be run sequentially because:
+
+1. Dependencies — migration 000002 likely depends on schema created in 000001. Running them out of order breaks those dependencies.
+
+2. Data loss — running a down on an older migration while newer ones are applied can drop columns/tables that newer migrations rely on.
+
+3. Dirty state — the migration tool tracks the current version as a single number. Running out of order confuses the version tracking and can leave the database in a dirty state.
+
+The safe workflow is always:
+```
+000001 up → 000002 up → 000003 up 
+000003 down → 000002 down → 000001 down 
+```
+If you need to fix a specific migration, the correct approach is to:
+
+Roll back down to that migration sequentially
+Fix the migration file
+Run up again sequentially
+
+
 #### Migration downs
 migrate down by default only steps down 1 migration at a time.
 
@@ -156,3 +177,17 @@ migrate ... down → rolls back 1 migration (your current version)
 migrate ... down 2 → rolls back 2 migrations
 migrate ... drop → drops everything (dangerous, no steps)
 So if you're on version 000001, running down will only execute 000001_init_schema.down.sql. A 000002 down would only run if you were on version 000002 or passed a steps argument that covers it.
+
+#### Migration target specific migration
+specific number
+```sh
+migrate -path infra/migrations/scripts \
+  -database "postgres://myuser:mypassword@localhost:5433/jobs_webcrawler?sslmode=disable" \
+  up 1
+```
+
+```sh
+migrate -path infra/migrations/scripts \
+  -database "postgres://myuser:mypassword@localhost:5433/jobs_webcrawler?sslmode=disable" \
+  down 1
+```

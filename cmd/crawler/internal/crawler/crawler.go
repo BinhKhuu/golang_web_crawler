@@ -11,12 +11,14 @@ type Fetcher interface {
 }
 
 type CrawlerState struct {
-	Visited map[string]bool
-	Lock    sync.Mutex
+	visited  map[string]bool
+	lock     sync.Mutex
+	wg       sync.WaitGroup
+	maxDepth int
 }
 
 type Crawler interface {
-	CrawlAsync(wg *sync.WaitGroup, startUrl string, fetcher Fetcher, parser Parser, storage StorageService) error
+	CrawlAsync(startUrl string, currentDepth int, fetcher Fetcher, parser Parser, storage StorageService) error
 	IsNavigated(url string) bool
 	MarkVisited(url string)
 }
@@ -27,24 +29,24 @@ type Parser interface {
 
 // StorageService defines how crawl results are persisted
 type StorageService interface {
-	Store(result models.RawData) error
+	StoreRawData(result models.RawData) error
 }
 
-// Compile-time assertion to ensure CrawlerState implements Crawler interface
-var _ Crawler = (*CrawlerState)(nil)
-
-func (c *CrawlerState) CrawlAsync(wg *sync.WaitGroup, startUrl string, fetcher Fetcher, parser Parser, storage StorageService) error {
-	defer wg.Done()
-	c.Lock.Lock()
-	if c.Visited == nil {
-		c.Visited = make(map[string]bool)
+func (c *CrawlerState) CrawlAsync(startUrl string, depth int, fetcher Fetcher, parser Parser, storage StorageService) error {
+	if depth == 0 {
+		// todo maybe add logging to indicate why we are stopping the crawl at this point
+		return nil // Reached max depth, stop crawling further
 	}
-	if c.Visited[startUrl] {
-		c.Lock.Unlock()
+	c.lock.Lock()
+	if c.visited == nil {
+		c.visited = make(map[string]bool)
+	}
+	if c.visited[startUrl] {
+		c.lock.Unlock()
 		return nil
 	}
-	c.Visited[startUrl] = true
-	c.Lock.Unlock()
+	c.visited[startUrl] = true
+	c.lock.Unlock()
 
 	fetchResult, err := fetcher.Fetch(startUrl)
 	if err != nil {
@@ -65,15 +67,17 @@ func (c *CrawlerState) CrawlAsync(wg *sync.WaitGroup, startUrl string, fetcher F
 			Raw_content: string(fetchResult.Body),
 			Fetched_at:  "", // This can be set to current timestamp if needed
 		}
-		if err := storage.Store(crawlResult); err != nil {
+		if err := storage.StoreRawData(crawlResult); err != nil {
 			log.Printf("error storing result for URL %s: %v", startUrl, err)
 		}
 	}
 
 	for _, link := range links {
-		wg.Add(1)
+		c.wg.Add(1)
 		go func(url string) {
-			if err := c.CrawlAsync(wg, url, fetcher, parser, storage); err != nil {
+			defer c.wg.Done()
+			depth := depth - 1
+			if err := c.CrawlAsync(url, depth, fetcher, parser, storage); err != nil {
 				log.Printf("error crawling URL %s: %v", url, err)
 			}
 		}(link)
@@ -83,22 +87,28 @@ func (c *CrawlerState) CrawlAsync(wg *sync.WaitGroup, startUrl string, fetcher F
 }
 
 func (c *CrawlerState) IsNavigated(url string) bool {
-	c.Lock.Lock()
-	defer c.Lock.Unlock()
-	return c.Visited[url]
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	return c.visited[url]
 }
 
 func (c *CrawlerState) MarkVisited(url string) {
-	c.Lock.Lock()
-	defer c.Lock.Unlock()
-	if c.Visited == nil {
-		c.Visited = make(map[string]bool)
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	if c.visited == nil {
+		c.visited = make(map[string]bool)
 	}
-	c.Visited[url] = true
+	c.visited[url] = true
 }
 
-func NewCrawler() *CrawlerState {
+func NewCrawler(maxDepth int) *CrawlerState {
 	return &CrawlerState{
-		Visited: make(map[string]bool),
+		visited:  make(map[string]bool),
+		wg:       sync.WaitGroup{},
+		maxDepth: maxDepth,
 	}
+}
+
+func (c *CrawlerState) Wait() {
+	c.wg.Wait()
 }

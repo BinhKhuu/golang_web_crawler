@@ -10,6 +10,8 @@ import (
 // Compile-time assertions
 var _ Fetcher = (*MockFetchResults)(nil)
 var _ Parser = (*MockParserResults)(nil)
+var _ StorageService = (*MockStorageService)(nil)
+var maxDepth = 4
 
 type MockFetchResults struct {
 	URL        string
@@ -39,13 +41,13 @@ type MockStorageService struct {
 	Stored []models.RawData
 }
 
-func (m *MockStorageService) Store(result models.RawData) error {
+func (m *MockStorageService) StoreRawData(result models.RawData) error {
 	m.Stored = append(m.Stored, result)
 	return nil
 }
 
 func TestIsNavigated(t *testing.T) {
-	c := NewCrawler()
+	c := NewCrawler(maxDepth)
 	c.MarkVisited("https://example.com")
 
 	if !c.IsNavigated("https://example.com") {
@@ -58,17 +60,17 @@ func TestIsNavigated(t *testing.T) {
 
 func Test_MarkVisited(t *testing.T) {
 	url := "http://example.com"
-	c := NewCrawler()
+	c := NewCrawler(maxDepth)
 
 	c.MarkVisited(url)
 
-	if c.Visited[url] != true {
+	if c.visited[url] != true {
 		t.Errorf("expected MarkVisited to mark URL as visited")
 	}
 }
 
 func Test_ConcurrentMarkVisited(t *testing.T) {
-	c := NewCrawler()
+	c := NewCrawler(maxDepth)
 	var wg sync.WaitGroup
 
 	for i := 0; i < 100; i++ {
@@ -84,14 +86,14 @@ func Test_ConcurrentMarkVisited(t *testing.T) {
 	// concurrent map writes would cause a panic, so if we got here, it means the method is thread-safe. Now we check the results.
 	// Only one goroutine should see false (not navigated yet)
 
-	if len(c.Visited) != 100 {
-		t.Errorf("expected 100 visited URLs, got %d", len(c.Visited))
+	if len(c.visited) != 100 {
+		t.Errorf("expected 100 visited URLs, got %d", len(c.visited))
 	}
 
 }
 
 func Test_VisitedIsThreadSafe(t *testing.T) {
-	c := NewCrawler()
+	c := NewCrawler(maxDepth)
 	var wg sync.WaitGroup
 	url := "http://example.com"
 
@@ -129,20 +131,20 @@ func createMockStoreageService() *MockStorageService {
 	}
 }
 
+// todo this test does not assert if the goroutines have been run corectly
 func Test_CrawlAsync(t *testing.T) {
 	// todo implement test for CrawlAsync, maybe using a mock fetcher that returns predefined results and checking if the crawler correctly marks URLs as visited and handles errors
 	mockFetcher := createMockFetchResults("https://example.com", 200, []byte("mock body"), nil)
 	mockParser := createMockParseResults([]string{"https://example.com/about", "https://example.com/contact"})
 	mockStorage := createMockStoreageService()
-	c := NewCrawler()
+	c := NewCrawler(maxDepth)
 
-	var wg sync.WaitGroup
-	wg.Add(1)
-	err := c.CrawlAsync(&wg, "https://example.com", mockFetcher, mockParser, mockStorage)
+	err := c.CrawlAsync("https://example.com", maxDepth, mockFetcher, mockParser, mockStorage)
+	c.Wait()
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	wg.Wait()
+	c.Wait()
 
 	if len(mockStorage.Stored) == 0 {
 		t.Error("expected storage to have at least one result")
@@ -151,3 +153,7 @@ func Test_CrawlAsync(t *testing.T) {
 		t.Errorf("unexpected stored URL: %s", mockStorage.Stored[0].URL)
 	}
 }
+
+// todo test max depth is respected
+
+// todo test that if fetcher returns an error the crawl does not continue to parse and store results
