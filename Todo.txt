@@ -1,15 +1,12 @@
-1. CrawlAsync have a property to lock down the links that are traversed to the same domain as the starting url
 1. storing raw html as text is unsafe need to look into santisation
 2. CrawlAsync Tests
     - Capture if max depth is respected
     - Main CrawlAsync Tests needs to:
-        - Crawl to max depth
         - Insert items into a list, wait on all go rotuines to finish
         - Assert that all go routines finish before the main caller finishes
 3. Storage Tests 
     - Persistant Tests with docker containers
 4. Go through Todos there are database setups etc to finish
-
 
 5. Parser is parsing links new branch to parse job data when scheudling doing a job crawl
     - the scheudler needs to control the links and which parser is used to store that crawled links data

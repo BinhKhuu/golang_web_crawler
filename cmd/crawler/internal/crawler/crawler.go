@@ -30,7 +30,6 @@ type Parser interface {
 	ParseLinks(body []byte) ([]string, error)
 }
 
-// StorageService defines how crawl results are persisted
 type StorageService interface {
 	StoreRawData(result models.RawData) error
 }
