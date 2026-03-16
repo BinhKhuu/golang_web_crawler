@@ -12,7 +12,12 @@ import (
 var _ Fetcher = (*MockFetchResults)(nil)
 var _ Parser = (*MockParserResults)(nil)
 var _ StorageService = (*MockStorageService)(nil)
-var maxDepth = 4
+
+const (
+	testBaseURL = "https://example.com"
+	maxDepth    = 4
+	testDomain  = "example.com"
+)
 
 type MockFetchResults struct {
 	URL        string
@@ -50,9 +55,9 @@ func (m *MockStorageService) StoreRawData(result models.RawData) error {
 
 func TestIsNavigated(t *testing.T) {
 	c := createTestCrawler()
-	c.MarkVisited("https://example.com")
+	c.MarkVisited(testBaseURL)
 
-	if !c.IsNavigated("https://example.com") {
+	if !c.IsNavigated(testBaseURL) {
 		t.Error("expected URL to be marked as visited")
 	}
 	if c.IsNavigated("https://other.com") {
@@ -61,7 +66,7 @@ func TestIsNavigated(t *testing.T) {
 }
 
 func Test_MarkVisited(t *testing.T) {
-	url := "http://example.com"
+	url := testBaseURL
 	c := createTestCrawler()
 
 	c.MarkVisited(url)
@@ -79,23 +84,18 @@ func Test_ConcurrentMarkVisited(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			c.MarkVisited(fmt.Sprintf("https://example.com/%d", i))
+			c.MarkVisited(fmt.Sprintf(testBaseURL+"/%d", i))
 		}(i)
 	}
 
 	wg.Wait()
 
-	// concurrent map writes would cause a panic, so if we got here, it means the method is thread-safe. Now we check the results.
-	// Only one goroutine should see false (not navigated yet)
-
 	if len(c.visited) != 100 {
 		t.Errorf("expected 100 visited URLs, got %d", len(c.visited))
 	}
-
 }
 
 func Test_VisitedIsThreadSafe(t *testing.T) {
-
 	c := createTestCrawler()
 	var wg sync.WaitGroup
 	url := "http://example.com"
@@ -108,9 +108,6 @@ func Test_VisitedIsThreadSafe(t *testing.T) {
 		}()
 	}
 	wg.Wait()
-
-	// concurrent map writes would cause a panic, so if we got here, it means the method is thread-safe. Now we check the results.
-	// Only one goroutine should see false (not navigated yet)
 }
 
 func createMockFetchResults(url string, statusCode int, body []byte, err error) *MockFetchResults {
@@ -135,15 +132,13 @@ func createMockStoreageService() *MockStorageService {
 	}
 }
 
-// todo this test does not assert if the goroutines have been run corectly
 func Test_CrawlAsync(t *testing.T) {
-	// todo implement test for CrawlAsync, maybe using a mock fetcher that returns predefined results and checking if the crawler correctly marks URLs as visited and handles errors
-	mockFetcher := createMockFetchResults("https://example.com", 200, []byte("mock body"), nil)
-	mockParser := createMockParseResults([]string{"https://example.com/about", "https://example.com/contact"}, nil)
+	mockFetcher := createMockFetchResults(testBaseURL, 200, []byte("mock body"), nil)
+	mockParser := createMockParseResults([]string{testBaseURL + "/about", testBaseURL + "/contact"}, nil)
 	mockStorage := createMockStoreageService()
 	c := createTestCrawler()
 
-	err := c.CrawlAsync("https://example.com", maxDepth, mockFetcher, mockParser, mockStorage)
+	err := c.CrawlAsync(testBaseURL, maxDepth, mockFetcher, mockParser, mockStorage)
 	c.Wait()
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -153,19 +148,20 @@ func Test_CrawlAsync(t *testing.T) {
 	if len(mockStorage.Stored) == 0 {
 		t.Error("expected storage to have at least one result")
 	}
-	if mockStorage.Stored[0].URL != "https://example.com" {
+	if mockStorage.Stored[0].URL != testBaseURL {
 		t.Errorf("unexpected stored URL: %s", mockStorage.Stored[0].URL)
 	}
 }
 
 func createTestCrawler(allowedDomains ...string) *CrawlerState {
 	if len(allowedDomains) == 0 {
-		allowedDomains = []string{"example.com"}
+		allowedDomains = []string{testDomain}
 	}
 	return NewCrawler(maxDepth, allowedDomains)
 }
 
 func Test_IsAllowedDomain(t *testing.T) {
+	const otherDomain = "other.com"
 	tc := []struct {
 		testName       string
 		url            string
@@ -174,20 +170,20 @@ func Test_IsAllowedDomain(t *testing.T) {
 	}{
 		{
 			testName:       "URL is in allowed domains",
-			url:            "https://example.com/page",
-			allowedDomains: []string{"example.com", "other.com"},
+			url:            testBaseURL + "/page",
+			allowedDomains: []string{testDomain, otherDomain},
 			expectedResult: true,
 		},
 		{
 			testName:       "URL is not in allowed domains",
 			url:            "https://bad.com/page",
-			allowedDomains: []string{"example.com", "other.com", "bads.com"},
+			allowedDomains: []string{testDomain, otherDomain, "bads.com"},
 			expectedResult: false,
 		},
 		{
 			testName:       "URL is in allowed domains as subdomain",
 			url:            "https://sub.example.com/page",
-			allowedDomains: []string{"example.com"},
+			allowedDomains: []string{testDomain},
 			expectedResult: true,
 		},
 	}
@@ -211,20 +207,20 @@ func Test_containsDomain(t *testing.T) {
 	}{
 		{
 			testName:       "URL contains domain",
-			url:            "https://example.com/page",
-			domain:         "example.com",
+			url:            testBaseURL + "/page",
+			domain:         testDomain,
 			expectedResult: true,
 		},
 		{
 			testName:       "URL does not contain domain",
 			url:            "https://other.com/page",
-			domain:         "example.com",
+			domain:         testDomain,
 			expectedResult: false,
 		},
 		{
 			testName:       "URL contains domain as subdomain",
 			url:            "https://sub.example.com/page",
-			domain:         "example.com",
+			domain:         testDomain,
 			expectedResult: true,
 		},
 	}
@@ -234,20 +230,19 @@ func Test_containsDomain(t *testing.T) {
 			result := containsDomain(tc.url, tc.domain)
 			if result != tc.expectedResult {
 				t.Errorf("unexpected result for URL %s and domain %s: got %v, want %v", tc.url, tc.domain, result, tc.expectedResult)
-
 			}
 		})
 	}
 }
 
 func Test_MaxDepthIsRespected(t *testing.T) {
-	allowedDomains := []string{"example.com"}
+	allowedDomains := []string{testDomain}
 	c := createTestCrawler(allowedDomains...)
-	mockFetcher := createMockFetchResults("https://example.com", 200, []byte("mock body"), nil)
-	mockParser := createMockParseResults([]string{"https://example.com/about", "https://example.com/contact"}, nil)
+	mockFetcher := createMockFetchResults(testBaseURL, 200, []byte("mock body"), nil)
+	mockParser := createMockParseResults([]string{testBaseURL + "/about", testBaseURL + "/contact"}, nil)
 	mockStorage := createMockStoreageService()
 
-	if err := c.CrawlAsync("https://example.com", 1, mockFetcher, mockParser, mockStorage); err != nil {
+	if err := c.CrawlAsync(testBaseURL, 1, mockFetcher, mockParser, mockStorage); err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
@@ -266,23 +261,23 @@ func Test_ShouldCrawl(t *testing.T) {
 		expectedResult bool
 	}{
 		{
-			allowedDomains: []string{"example.com"},
+			allowedDomains: []string{testDomain},
 			testName:       "URL is allowed and not visited",
-			url:            "https://example.com",
+			url:            testBaseURL,
 			depth:          1,
 			markVisited:    false,
 			expectedResult: true,
 		},
 		{
-			allowedDomains: []string{"example.com"},
+			allowedDomains: []string{testDomain},
 			testName:       "Depth is 0 so should not crawl",
-			url:            "https://example.com",
+			url:            testBaseURL,
 			depth:          0,
 			markVisited:    false,
 			expectedResult: false,
 		},
 		{
-			allowedDomains: []string{"example.com"},
+			allowedDomains: []string{testDomain},
 			testName:       "URL is not in allowed domains",
 			url:            "https://bad.com",
 			depth:          1,
@@ -290,9 +285,9 @@ func Test_ShouldCrawl(t *testing.T) {
 			expectedResult: false,
 		},
 		{
-			allowedDomains: []string{"example.com"},
+			allowedDomains: []string{testDomain},
 			testName:       "URL is already visited",
-			url:            "https://example.com",
+			url:            testBaseURL,
 			depth:          1,
 			markVisited:    true,
 			expectedResult: false,
@@ -312,19 +307,17 @@ func Test_ShouldCrawl(t *testing.T) {
 			if result != tc.expectedResult {
 				t.Errorf("unexpected result for URL %s and allowed domains %v: got %v, want %v", tc.url, tc.allowedDomains, result, tc.expectedResult)
 			}
-
 		})
 	}
-
 }
 
 func Test_ProcessUrl(t *testing.T) {
 	t.Run("successful fetch and parse", func(t *testing.T) {
-		mockFetcher := createMockFetchResults("https://example.com", 200, []byte("mock body"), nil)
-		mockParser := createMockParseResults([]string{"https://example.com/about", "https://example.com/contact"}, nil)
+		mockFetcher := createMockFetchResults(testBaseURL, 200, []byte("mock body"), nil)
+		mockParser := createMockParseResults([]string{testBaseURL + "/about", testBaseURL + "/contact"}, nil)
 		mockStorage := createMockStoreageService()
 
-		links, err := processUrl(mockFetcher, "https://example.com", mockParser, mockStorage)
+		links, err := processUrl(mockFetcher, testBaseURL, mockParser, mockStorage)
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
 		}
@@ -334,11 +327,11 @@ func Test_ProcessUrl(t *testing.T) {
 	})
 
 	t.Run("fetcher returns error", func(t *testing.T) {
-		mockFetcher := createMockFetchResults("https://example.com", 500, nil, errors.New("fetch error"))
+		mockFetcher := createMockFetchResults(testBaseURL, 500, nil, errors.New("fetch error"))
 		mockParser := createMockParseResults(nil, nil)
 		mockStorage := createMockStoreageService()
 
-		links, err := processUrl(mockFetcher, "https://example.com", mockParser, mockStorage)
+		links, err := processUrl(mockFetcher, testBaseURL, mockParser, mockStorage)
 		if err == nil {
 			t.Error("expected error, got nil")
 		}
@@ -348,11 +341,11 @@ func Test_ProcessUrl(t *testing.T) {
 	})
 
 	t.Run("parser returns error", func(t *testing.T) {
-		mockFetcher := createMockFetchResults("https://example.com", 200, []byte("mock body"), nil)
-		mockParser := createMockParseResults(nil, errors.New("fetch error")) // simulate parse failure
+		mockFetcher := createMockFetchResults(testBaseURL, 200, []byte("mock body"), nil)
+		mockParser := createMockParseResults(nil, errors.New("parse error"))
 		mockStorage := createMockStoreageService()
 
-		links, err := processUrl(mockFetcher, "https://example.com", mockParser, mockStorage)
+		links, err := processUrl(mockFetcher, testBaseURL, mockParser, mockStorage)
 		if err == nil {
 			t.Error("expected error, got nil")
 		}
@@ -362,10 +355,10 @@ func Test_ProcessUrl(t *testing.T) {
 	})
 
 	t.Run("storage is nil", func(t *testing.T) {
-		mockFetcher := createMockFetchResults("https://example.com", 200, []byte("mock body"), nil)
-		mockParser := createMockParseResults([]string{"https://example.com/about"}, nil)
+		mockFetcher := createMockFetchResults(testBaseURL, 200, []byte("mock body"), nil)
+		mockParser := createMockParseResults([]string{testBaseURL + "/about"}, nil)
 
-		links, err := processUrl(mockFetcher, "https://example.com", mockParser, nil)
+		links, err := processUrl(mockFetcher, testBaseURL, mockParser, nil)
 		if err != nil {
 			t.Fatalf("expected no error with nil storage, got %v", err)
 		}
