@@ -47,7 +47,7 @@ func (m *MockStorageService) StoreRawData(result models.RawData) error {
 }
 
 func TestIsNavigated(t *testing.T) {
-	c := NewCrawler(maxDepth)
+	c := createTestCrawler()
 	c.MarkVisited("https://example.com")
 
 	if !c.IsNavigated("https://example.com") {
@@ -60,7 +60,7 @@ func TestIsNavigated(t *testing.T) {
 
 func Test_MarkVisited(t *testing.T) {
 	url := "http://example.com"
-	c := NewCrawler(maxDepth)
+	c := createTestCrawler()
 
 	c.MarkVisited(url)
 
@@ -70,7 +70,7 @@ func Test_MarkVisited(t *testing.T) {
 }
 
 func Test_ConcurrentMarkVisited(t *testing.T) {
-	c := NewCrawler(maxDepth)
+	c := createTestCrawler()
 	var wg sync.WaitGroup
 
 	for i := 0; i < 100; i++ {
@@ -93,7 +93,8 @@ func Test_ConcurrentMarkVisited(t *testing.T) {
 }
 
 func Test_VisitedIsThreadSafe(t *testing.T) {
-	c := NewCrawler(maxDepth)
+
+	c := createTestCrawler()
 	var wg sync.WaitGroup
 	url := "http://example.com"
 
@@ -137,7 +138,7 @@ func Test_CrawlAsync(t *testing.T) {
 	mockFetcher := createMockFetchResults("https://example.com", 200, []byte("mock body"), nil)
 	mockParser := createMockParseResults([]string{"https://example.com/about", "https://example.com/contact"})
 	mockStorage := createMockStoreageService()
-	c := NewCrawler(maxDepth)
+	c := createTestCrawler()
 
 	err := c.CrawlAsync("https://example.com", maxDepth, mockFetcher, mockParser, mockStorage)
 	c.Wait()
@@ -154,6 +155,100 @@ func Test_CrawlAsync(t *testing.T) {
 	}
 }
 
-// todo test max depth is respected
+func createTestCrawler(allowedDomains ...string) *CrawlerState {
+	if len(allowedDomains) == 0 {
+		allowedDomains = []string{"example.com"}
+	}
+	return NewCrawler(maxDepth, allowedDomains)
+}
 
-// todo test that if fetcher returns an error the crawl does not continue to parse and store results
+func Test_IsAllowedDomain(t *testing.T) {
+	tc := []struct {
+		testName       string
+		url            string
+		allowedDomains []string
+		expectedResult bool
+	}{
+		{
+			testName:       "URL is in allowed domains",
+			url:            "https://example.com/page",
+			allowedDomains: []string{"example.com", "other.com"},
+			expectedResult: true,
+		},
+		{
+			testName:       "URL is not in allowed domains",
+			url:            "https://bad.com/page",
+			allowedDomains: []string{"example.com", "other.com", "bads.com"},
+			expectedResult: false,
+		},
+		{
+			testName:       "URL is in allowed domains as subdomain",
+			url:            "https://sub.example.com/page",
+			allowedDomains: []string{"example.com"},
+			expectedResult: true,
+		},
+	}
+
+	for _, tc := range tc {
+		t.Run(tc.testName, func(t *testing.T) {
+			result := isAllowedDomain(tc.url, tc.allowedDomains)
+			if result != tc.expectedResult {
+				t.Errorf("unexpected result for URL %s and allowed domains %v: got %v, want %v", tc.url, tc.allowedDomains, result, tc.expectedResult)
+			}
+		})
+	}
+}
+
+func Test_containsDomain(t *testing.T) {
+	tc := []struct {
+		testName       string
+		url            string
+		domain         string
+		expectedResult bool
+	}{
+		{
+			testName:       "URL contains domain",
+			url:            "https://example.com/page",
+			domain:         "example.com",
+			expectedResult: true,
+		},
+		{
+			testName:       "URL does not contain domain",
+			url:            "https://other.com/page",
+			domain:         "example.com",
+			expectedResult: false,
+		},
+		{
+			testName:       "URL contains domain as subdomain",
+			url:            "https://sub.example.com/page",
+			domain:         "example.com",
+			expectedResult: true,
+		},
+	}
+
+	for _, tc := range tc {
+		t.Run(tc.testName, func(t *testing.T) {
+			result := containsDomain(tc.url, tc.domain)
+			if result != tc.expectedResult {
+				t.Errorf("unexpected result for URL %s and domain %s: got %v, want %v", tc.url, tc.domain, result, tc.expectedResult)
+
+			}
+		})
+	}
+}
+
+func Test_MaxDepthIsRespected(t *testing.T) {
+	allowedDomains := []string{"example.com"}
+	c := createTestCrawler(allowedDomains...)
+	mockFetcher := createMockFetchResults("https://example.com", 200, []byte("mock body"), nil)
+	mockParser := createMockParseResults([]string{"https://example.com/about", "https://example.com/contact"})
+	mockStorage := createMockStoreageService()
+
+	if err := c.CrawlAsync("https://example.com", 1, mockFetcher, mockParser, mockStorage); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if len(c.visited) != 1 {
+		t.Errorf("expected depth traversal of 1 but got %d", len(c.visited))
+	}
+}

@@ -1,4 +1,4 @@
-1. CrawlAsync have a property lock down the links that are traversed to the same domain as the starting url
+1. CrawlAsync have a property to lock down the links that are traversed to the same domain as the starting url
 1. storing raw html as text is unsafe need to look into santisation
 2. CrawlAsync Tests
     - Capture if max depth is respected
