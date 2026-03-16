@@ -36,23 +36,9 @@ type StorageService interface {
 }
 
 func (c *CrawlerState) CrawlAsync(startUrl string, depth int, fetcher Fetcher, parser Parser, storage StorageService) error {
-	if depth == 0 {
-		// todo maybe add logging to indicate why we are stopping the crawl at this point
-		return nil // Reached max depth, stop crawling further
-	}
-	if !isAllowedDomain(startUrl, c.allowedDomains) {
+	if !shouldCrawl(depth, startUrl, c) {
 		return nil
 	}
-	c.lock.Lock()
-	if c.visited == nil {
-		c.visited = make(map[string]bool)
-	}
-	if c.visited[startUrl] {
-		c.lock.Unlock()
-		return nil
-	}
-	c.visited[startUrl] = true
-	c.lock.Unlock()
 
 	fetchResult, err := fetcher.Fetch(startUrl)
 	if err != nil {
@@ -90,6 +76,25 @@ func (c *CrawlerState) CrawlAsync(startUrl string, depth int, fetcher Fetcher, p
 	}
 
 	return nil
+}
+
+func shouldCrawl(depth int, startUrl string, c *CrawlerState) bool {
+	if depth == 0 {
+		return false
+	}
+	if !isAllowedDomain(startUrl, c.allowedDomains) {
+		return false
+	}
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	if c.visited == nil {
+		c.visited = make(map[string]bool)
+	}
+	if c.visited[startUrl] {
+		return false
+	}
+	c.visited[startUrl] = true
+	return true
 }
 
 func isAllowedDomain(url string, allowedDomains []string) bool {

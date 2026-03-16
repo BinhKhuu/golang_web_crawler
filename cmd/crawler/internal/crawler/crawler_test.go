@@ -252,3 +252,65 @@ func Test_MaxDepthIsRespected(t *testing.T) {
 		t.Errorf("expected depth traversal of 1 but got %d", len(c.visited))
 	}
 }
+
+func Test_ShouldCrawl(t *testing.T) {
+	tc := []struct {
+		testName       string
+		url            string
+		allowedDomains []string
+		depth          int
+		markVisited    bool
+		expectedResult bool
+	}{
+		{
+			allowedDomains: []string{"example.com"},
+			testName:       "URL is allowed and not visited",
+			url:            "https://example.com",
+			depth:          1,
+			markVisited:    false,
+			expectedResult: true,
+		},
+		{
+			allowedDomains: []string{"example.com"},
+			testName:       "Depth is 0 so should not crawl",
+			url:            "https://example.com",
+			depth:          0,
+			markVisited:    false,
+			expectedResult: false,
+		},
+		{
+			allowedDomains: []string{"example.com"},
+			testName:       "URL is not in allowed domains",
+			url:            "https://bad.com",
+			depth:          1,
+			markVisited:    false,
+			expectedResult: false,
+		},
+		{
+			allowedDomains: []string{"example.com"},
+			testName:       "URL is already visited",
+			url:            "https://example.com",
+			depth:          1,
+			markVisited:    true,
+			expectedResult: false,
+		},
+	}
+
+	for _, tc := range tc {
+		t.Run(tc.testName, func(t *testing.T) {
+			c := createTestCrawler(tc.allowedDomains...)
+
+			if tc.markVisited {
+				c.MarkVisited(tc.url)
+			}
+
+			result := shouldCrawl(tc.depth, tc.url, c)
+
+			if result != tc.expectedResult {
+				t.Errorf("unexpected result for URL %s and allowed domains %v: got %v, want %v", tc.url, tc.allowedDomains, result, tc.expectedResult)
+			}
+
+		})
+	}
+
+}
