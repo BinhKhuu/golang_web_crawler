@@ -1,6 +1,7 @@
 package crawler
 
 import (
+	"errors"
 	"fmt"
 	"golangwebcrawler/cmd/crawler/internal/models"
 	"sync"
@@ -31,10 +32,11 @@ func (m *MockFetchResults) Fetch(url string) (models.FetchResult, error) {
 
 type MockParserResults struct {
 	Links []string
+	Err   error
 }
 
 func (m *MockParserResults) ParseLinks(body []byte) ([]string, error) {
-	return m.Links, nil
+	return m.Links, m.Err
 }
 
 type MockStorageService struct {
@@ -120,9 +122,10 @@ func createMockFetchResults(url string, statusCode int, body []byte, err error) 
 	}
 }
 
-func createMockParseResults(links []string) *MockParserResults {
+func createMockParseResults(links []string, err error) *MockParserResults {
 	return &MockParserResults{
 		Links: links,
+		Err:   err,
 	}
 }
 
@@ -136,7 +139,7 @@ func createMockStoreageService() *MockStorageService {
 func Test_CrawlAsync(t *testing.T) {
 	// todo implement test for CrawlAsync, maybe using a mock fetcher that returns predefined results and checking if the crawler correctly marks URLs as visited and handles errors
 	mockFetcher := createMockFetchResults("https://example.com", 200, []byte("mock body"), nil)
-	mockParser := createMockParseResults([]string{"https://example.com/about", "https://example.com/contact"})
+	mockParser := createMockParseResults([]string{"https://example.com/about", "https://example.com/contact"}, nil)
 	mockStorage := createMockStoreageService()
 	c := createTestCrawler()
 
@@ -241,7 +244,7 @@ func Test_MaxDepthIsRespected(t *testing.T) {
 	allowedDomains := []string{"example.com"}
 	c := createTestCrawler(allowedDomains...)
 	mockFetcher := createMockFetchResults("https://example.com", 200, []byte("mock body"), nil)
-	mockParser := createMockParseResults([]string{"https://example.com/about", "https://example.com/contact"})
+	mockParser := createMockParseResults([]string{"https://example.com/about", "https://example.com/contact"}, nil)
 	mockStorage := createMockStoreageService()
 
 	if err := c.CrawlAsync("https://example.com", 1, mockFetcher, mockParser, mockStorage); err != nil {
@@ -313,4 +316,61 @@ func Test_ShouldCrawl(t *testing.T) {
 		})
 	}
 
+}
+
+func Test_ProcessUrl(t *testing.T) {
+	t.Run("successful fetch and parse", func(t *testing.T) {
+		mockFetcher := createMockFetchResults("https://example.com", 200, []byte("mock body"), nil)
+		mockParser := createMockParseResults([]string{"https://example.com/about", "https://example.com/contact"}, nil)
+		mockStorage := createMockStoreageService()
+
+		links, err := processUrl(mockFetcher, "https://example.com", mockParser, mockStorage)
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		if len(links) != 2 {
+			t.Errorf("expected 2 links, got %d", len(links))
+		}
+	})
+
+	t.Run("fetcher returns error", func(t *testing.T) {
+		mockFetcher := createMockFetchResults("https://example.com", 500, nil, errors.New("fetch error"))
+		mockParser := createMockParseResults(nil, nil)
+		mockStorage := createMockStoreageService()
+
+		links, err := processUrl(mockFetcher, "https://example.com", mockParser, mockStorage)
+		if err == nil {
+			t.Error("expected error, got nil")
+		}
+		if links != nil {
+			t.Error("expected nil links on error")
+		}
+	})
+
+	t.Run("parser returns error", func(t *testing.T) {
+		mockFetcher := createMockFetchResults("https://example.com", 200, []byte("mock body"), nil)
+		mockParser := createMockParseResults(nil, errors.New("fetch error")) // simulate parse failure
+		mockStorage := createMockStoreageService()
+
+		links, err := processUrl(mockFetcher, "https://example.com", mockParser, mockStorage)
+		if err == nil {
+			t.Error("expected error, got nil")
+		}
+		if links != nil {
+			t.Error("expected nil links on error")
+		}
+	})
+
+	t.Run("storage is nil", func(t *testing.T) {
+		mockFetcher := createMockFetchResults("https://example.com", 200, []byte("mock body"), nil)
+		mockParser := createMockParseResults([]string{"https://example.com/about"}, nil)
+
+		links, err := processUrl(mockFetcher, "https://example.com", mockParser, nil)
+		if err != nil {
+			t.Fatalf("expected no error with nil storage, got %v", err)
+		}
+		if len(links) != 1 {
+			t.Errorf("expected 1 link, got %d", len(links))
+		}
+	})
 }

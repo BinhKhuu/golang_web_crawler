@@ -40,14 +40,34 @@ func (c *CrawlerState) CrawlAsync(startUrl string, depth int, fetcher Fetcher, p
 		return nil
 	}
 
-	fetchResult, err := fetcher.Fetch(startUrl)
+	links, err := processUrl(fetcher, startUrl, parser, storage)
 	if err != nil {
 		return err
 	}
 
+	for _, link := range links {
+		c.wg.Add(1)
+		go func(url string) {
+			defer c.wg.Done()
+			depth := depth - 1
+			if err := c.CrawlAsync(url, depth, fetcher, parser, storage); err != nil {
+				log.Printf("error crawling URL %s: %v", url, err)
+			}
+		}(link)
+	}
+
+	return nil
+}
+
+func processUrl(fetcher Fetcher, startUrl string, parser Parser, storage StorageService) ([]string, error) {
+	fetchResult, err := fetcher.Fetch(startUrl)
+	if err != nil {
+		return nil, err
+	}
+
 	links, err := parser.ParseLinks(fetchResult.Body)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// todo  this should be storage data model not crawl result datamodel
@@ -63,19 +83,7 @@ func (c *CrawlerState) CrawlAsync(startUrl string, depth int, fetcher Fetcher, p
 			log.Printf("error storing result for URL %s: %v", startUrl, err)
 		}
 	}
-
-	for _, link := range links {
-		c.wg.Add(1)
-		go func(url string) {
-			defer c.wg.Done()
-			depth := depth - 1
-			if err := c.CrawlAsync(url, depth, fetcher, parser, storage); err != nil {
-				log.Printf("error crawling URL %s: %v", url, err)
-			}
-		}(link)
-	}
-
-	return nil
+	return links, nil
 }
 
 func shouldCrawl(depth int, startUrl string, c *CrawlerState) bool {
