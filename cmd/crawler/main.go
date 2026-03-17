@@ -21,7 +21,7 @@ func main() {
 	}
 	defer db.Close() //nolint:errcheck
 	httpClient := http.DefaultClient
-	allowedDomains := []string{"example.com"}
+	allowedDomains := []string{"example.com", "iana.org"}
 	crawler := crawler.NewCrawler(maxDepth, allowedDomains)
 	storage := storage.NewDBStorageService(db)
 

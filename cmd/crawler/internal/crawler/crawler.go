@@ -69,6 +69,10 @@ func processUrl(fetcher Fetcher, startUrl string, parser Parser, storage Storage
 		return nil, err
 	}
 
+	formattedLinks, err := formatLinks(links, startUrl)
+	if err != nil {
+		return nil, err
+	}
 	// todo  this should be storage data model not crawl result datamodel
 	// todo parser should attempt to clean up the raw_content? or should that be a seperate process not related to crawl
 	if storage != nil {
@@ -80,6 +84,23 @@ func processUrl(fetcher Fetcher, startUrl string, parser Parser, storage Storage
 		}
 		if err := storage.StoreRawData(crawlResult); err != nil {
 			log.Printf("error storing result for URL %s: %v", startUrl, err)
+		}
+	}
+	return formattedLinks, nil
+}
+
+func formatLinks(links []string, baseUrl string) ([]string, error) {
+	base, err := url.Parse(baseUrl)
+	if err != nil {
+		return nil, err
+	}
+	for i, link := range links {
+		parsed, err := url.Parse(link)
+		if err != nil {
+			continue
+		}
+		if !parsed.IsAbs() {
+			links[i] = base.ResolveReference(parsed).String()
 		}
 	}
 	return links, nil
@@ -104,6 +125,8 @@ func shouldCrawl(depth int, startUrl string, c *CrawlerState) bool {
 	return true
 }
 
+// todo links like /about should be converted to absolute urls before checking if they are in the allowed domains list
+// /about etc is a link on the same domain so it should be allowed
 func isAllowedDomain(url string, allowedDomains []string) bool {
 	for _, domain := range allowedDomains {
 		if containsDomain(url, domain) {
@@ -118,6 +141,7 @@ func containsDomain(rawURL, domain string) bool {
 	if err != nil {
 		return false
 	}
+
 	host := parsed.Hostname() // strips port if present
 	return host == domain || strings.HasSuffix(host, "."+domain)
 }

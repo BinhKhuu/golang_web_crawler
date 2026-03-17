@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"golangwebcrawler/cmd/crawler/internal/models"
+	"reflect"
 	"sync"
 	"testing"
 )
@@ -198,7 +199,7 @@ func Test_IsAllowedDomain(t *testing.T) {
 	}
 }
 
-func Test_containsDomain(t *testing.T) {
+func Test_ContainsDomain(t *testing.T) {
 	tc := []struct {
 		testName       string
 		url            string
@@ -222,6 +223,12 @@ func Test_containsDomain(t *testing.T) {
 			url:            "https://sub.example.com/page",
 			domain:         testDomain,
 			expectedResult: true,
+		},
+		{
+			testName:       "URL link path with just / should not be considered as containing the domain",
+			url:            "/about",
+			domain:         testDomain,
+			expectedResult: false,
 		},
 	}
 
@@ -366,4 +373,37 @@ func Test_ProcessUrl(t *testing.T) {
 			t.Errorf("expected 1 link, got %d", len(links))
 		}
 	})
+}
+
+func Test_FormatLinks(t *testing.T) {
+	links := []string{
+		"/about",
+		"https://example.com/contact",
+		"//example.com/blog",
+		"test",
+		"/about/me",
+	}
+
+	baseUrl := "https://example.com"
+
+	expected := []string{
+		"https://example.com/about",
+		"https://example.com/contact",
+		"https://example.com/blog",
+		"https://example.com/test",
+		"https://example.com/about/me",
+	}
+
+	result, err := formatLinks(links, baseUrl)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if len(result) != len(expected) {
+		t.Fatalf("expected %d links, got %d", len(expected), len(result))
+	}
+
+	if !reflect.DeepEqual(result, expected) {
+		t.Errorf("unexpected formatted links: got %v, want %v", result, expected)
+	}
 }
