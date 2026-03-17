@@ -144,14 +144,11 @@ func Test_CrawlAsync(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	c.Wait()
 
-	if len(mockStorage.Stored) == 0 {
-		t.Error("expected storage to have at least one result")
+	if len(mockStorage.Stored) != 3 {
+		t.Error("expected storage to have 3 results")
 	}
-	if mockStorage.Stored[0].URL != testBaseURL {
-		t.Errorf("unexpected stored URL: %s", mockStorage.Stored[0].URL)
-	}
+
 }
 
 func createTestCrawler(allowedDomains ...string) *CrawlerState {

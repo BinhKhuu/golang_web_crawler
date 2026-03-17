@@ -1,4 +1,4 @@
-1. Storing raw HTML as plain text is safe - data is only retrieved server-side and never rendered in a browser, so XSS is not a concern.
+1. Storing raw HTML as plain text is safe - data is only retrieved server-side and never concern.
 2. CrawlAsync Tests
     - Capture if max depth is respected
     - Main CrawlAsync Tests needs to:
