@@ -9,10 +9,12 @@ import (
 	"testing"
 )
 
-// Compile-time assertions
-var _ Fetcher = (*MockFetchResults)(nil)
-var _ Parser = (*MockParserResults)(nil)
-var _ StorageService = (*MockStorageService)(nil)
+// Compile-time assertions.
+var (
+	_ Fetcher        = (*MockFetchResults)(nil)
+	_ Parser         = (*MockParserResults)(nil)
+	_ StorageService = (*MockStorageService)(nil)
+)
 
 const (
 	testBaseURL = "https://example.com"
@@ -81,7 +83,7 @@ func Test_ConcurrentMarkVisited(t *testing.T) {
 	c := createTestCrawler()
 	var wg sync.WaitGroup
 
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
@@ -101,12 +103,10 @@ func Test_VisitedIsThreadSafe(t *testing.T) {
 	var wg sync.WaitGroup
 	url := "http://example.com"
 
-	for i := 0; i < 100; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range 100 {
+		wg.Go(func() {
 			c.MarkVisited(url)
-		}()
+		})
 	}
 	wg.Wait()
 }
@@ -148,7 +148,6 @@ func Test_CrawlAsync(t *testing.T) {
 	if len(mockStorage.Stored) != 3 {
 		t.Error("expected storage to have 3 results")
 	}
-
 }
 
 func createTestCrawler(allowedDomains ...string) *CrawlerState {

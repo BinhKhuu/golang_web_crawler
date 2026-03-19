@@ -19,14 +19,14 @@ import (
 	"golangwebcrawler/cmd/crawler/internal/storage"
 )
 
-// Storage
+// Storage.
 var _ crawler.StorageService = (*storage.DBStorageService)(nil)
 
-// Fetcher
+// Fetcher.
 var _ crawler.Fetcher = (*fetcher.HTTPFetcher)(nil)
 
-// Parser
-var _ crawler.Parser = (*parser.HttpParser)(nil)
+// Parser.
+var _ crawler.Parser = (*parser.HTTPParser)(nil)
 
-// Crawler
+// Crawler.
 var _ crawler.Crawler = (*crawler.CrawlerState)(nil)

@@ -1,15 +1,19 @@
 package main
 
 import (
+	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"golangwebcrawler/cmd/crawler/internal/crawler"
 	"golangwebcrawler/cmd/crawler/internal/fetcher"
 	"golangwebcrawler/cmd/crawler/internal/parser"
 	"golangwebcrawler/cmd/crawler/internal/storage"
 	"log"
+	"net"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
@@ -26,13 +30,13 @@ func main() {
 		log.Fatalf("failed to set up database: %v", err)
 		return
 	}
-	defer db.Close() //nolint:errcheck
+	defer db.Close()
 	httpClient := http.DefaultClient
 	allowedDomains := []string{"example.com", "iana.org"}
 	crawler := crawler.NewCrawler(maxDepth, allowedDomains)
 	storage := storage.NewDBStorageService(db)
 
-	parser := parser.NewHttpParser()
+	parser := parser.NewHTTPParser()
 
 	fetcher := fetcher.NewHTTPFetcher(httpClient)
 
@@ -41,51 +45,55 @@ func main() {
 		log.Fatalf("failed to crawl: %v", err)
 	}
 	crawler.Wait()
-
 }
 
 func setupDatabase() (*sql.DB, error) {
-	DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_NAME, DB_SSLMODE, result, err, shouldReturn := loadDBSettings()
-	if shouldReturn {
-		return result, err
+	conStr, err := getConnectionString()
+	if err != nil {
+		return nil, fmt.Errorf("failed to load database settings: %w", err)
 	}
-	conStr := fmt.Sprintf(`postgres://%s:%s@%s:%s/%s?sslmode=%s`, DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_NAME, DB_SSLMODE) //`postgres://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSLMODE}`
 	conn, err := sql.Open("postgres", conStr)
 	if err != nil {
 		log.Fatalf("failed to open connection: %v", err)
 	}
 
-	if err := conn.Ping(); err != nil {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	if err := conn.PingContext(ctx); err != nil {
 		log.Fatalf("failed to ping database: %v", err)
 	}
 
 	return conn, nil
 }
 
-func loadDBSettings() (string, string, string, string, string, string, *sql.DB, error, bool) {
-	DB_USER := os.Getenv("DB_USER")
-	if DB_USER == "" {
-		return "", "", "", "", "", "", nil, fmt.Errorf("DB_USER environment variable is not set"), true
+func getConnectionString() (string, error) {
+	dbUser := os.Getenv("DB_USER")
+	if dbUser == "" {
+		return "", errors.New("DB_USER environment variable is not set")
 	}
-	DB_PASSWORD := os.Getenv("DB_PASSWORD")
-	if DB_PASSWORD == "" {
-		return "", "", "", "", "", "", nil, fmt.Errorf("DB_PASSWORD environment variable is not set"), true
+	dbPassword := os.Getenv("DB_PASSWORD")
+	if dbPassword == "" {
+		return "", errors.New("DB_PASSWORD environment variable is not set")
 	}
-	DB_HOST := os.Getenv("DB_HOST")
-	if DB_HOST == "" {
-		return "", "", "", "", "", "", nil, fmt.Errorf("DB_HOST environment variable is not set"), true
+	dbHost := os.Getenv("DB_HOST")
+	if dbHost == "" {
+		return "", errors.New("DB_HOST environment variable is not set")
 	}
-	DB_PORT := os.Getenv("DB_PORT")
-	if DB_PORT == "" {
-		return "", "", "", "", "", "", nil, fmt.Errorf("DB_PORT environment variable is not set"), true
+	dbPort := os.Getenv("DB_PORT")
+	if dbPort == "" {
+		return "", errors.New("DB_PORT environment variable is not set")
 	}
-	DB_NAME := os.Getenv("DB_NAME")
-	if DB_NAME == "" {
-		return "", "", "", "", "", "", nil, fmt.Errorf("DB_NAME environment variable is not set"), true
+	dbName := os.Getenv("DB_NAME")
+	if dbName == "" {
+		return "", errors.New("DB_NAME environment variable is not set")
 	}
-	DB_SSLMODE := os.Getenv("DB_SSLMODE")
-	if DB_SSLMODE == "" {
-		return "", "", "", "", "", "", nil, fmt.Errorf("DB_SSLMODE environment variable is not set"), true
+	dbSslmode := os.Getenv("DB_SSLMODE")
+	if dbSslmode == "" {
+		return "", errors.New("DB_SSLMODE environment variable is not set")
 	}
-	return DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_NAME, DB_SSLMODE, nil, nil, false
+
+	hostPort := net.JoinHostPort(dbHost, dbPort)
+	conStr := fmt.Sprintf(`postgres://%s:%s@%s/%s?sslmode=%s`, dbUser, dbPassword, hostPort, dbName, dbSslmode)
+	return conStr, nil
 }

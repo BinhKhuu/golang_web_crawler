@@ -19,7 +19,7 @@ func (s *DBStorageService) StoreRawData(result models.RawData) error {
 		VALUES ($1, $2, $3)
 		ON CONFLICT (url) 
 		DO UPDATE SET content_type = $2, raw_content = $3, fetched_at = NOW()`,
-		result.URL, result.ContentType, string(result.Raw_content),
+		result.URL, result.ContentType, result.Raw_content,
 	)
 	return err
 }

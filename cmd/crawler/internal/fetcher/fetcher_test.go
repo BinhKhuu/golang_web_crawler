@@ -28,7 +28,7 @@ func (m *MockHTTPClient_Error) Get(url string) (*http.Response, error) {
 
 func TestHTTPFetcher_Fetch(t *testing.T) {
 	mockResponse := &http.Response{
-		StatusCode: 200,
+		StatusCode: http.StatusOK,
 		Body:       io.NopCloser(bytes.NewBufferString("mock body")),
 	}
 	mockClient := &MockHTTPClient_Success{Response: mockResponse, Err: nil}
@@ -40,7 +40,7 @@ func TestHTTPFetcher_Fetch(t *testing.T) {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if result.StatusCode != 200 {
+	if result.StatusCode != http.StatusOK {
 		t.Errorf("expected status code 200, got %d", result.StatusCode)
 	}
 
@@ -64,7 +64,7 @@ func Test_HTTPFetcher_Error(t *testing.T) {
 		t.Fatalf("expected error")
 	}
 
-	if err != mockError {
+	if !errors.Is(err, mockError) {
 		t.Errorf("expected error %v, got %v", mockError, err)
 	}
 }
@@ -105,7 +105,7 @@ func Test_HTTPFetcher_Fetch_Error(t *testing.T) {
 		t.Fatalf("expected an error, got nil")
 	}
 
-	if err != http.ErrHandlerTimeout {
+	if !errors.Is(err, http.ErrHandlerTimeout) {
 		t.Errorf("expected error %v, got %v", http.ErrHandlerTimeout, err)
 	}
 }

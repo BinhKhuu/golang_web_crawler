@@ -1,3 +1,6 @@
+1. golangci-lint run 
+    go through the errors and resolve
+
 4. Go through Todos there are database setups etc to finish
 
 5. Parser is parsing links new branch to parse job data when scheudling doing a job crawl

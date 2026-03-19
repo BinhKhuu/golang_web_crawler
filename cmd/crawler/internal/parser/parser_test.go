@@ -7,7 +7,7 @@ import (
 
 func Test_ParseLinks(t *testing.T) {
 	body := []byte("<html><body><a href='http://example.com'>Example</a><a href='http://test.com'>Test</a></body></html>")
-	parser := NewHttpParser()
+	parser := NewHTTPParser()
 	results, err := parser.ParseLinks(body)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)

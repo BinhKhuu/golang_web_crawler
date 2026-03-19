@@ -9,14 +9,14 @@ import (
 	_ "github.com/lib/pq" // postgres driver
 )
 
-// Test_Migrations connects to the test database in workflows the credentials are in test.yaml
+// Test_Migrations connects to the test database in workflows the credentials are in test.yaml.
 func Test_Migrations(t *testing.T) {
 	conStr := "postgres://postgres:postgres@localhost:5432/testdb?sslmode=disable"
 	conn, err := sql.Open("postgres", conStr)
 	if err != nil {
 		t.Fatalf("failed to open connection: %v", err)
 	}
-	defer conn.Close() //nolint:errcheck
+	defer conn.Close()
 
 	if err := conn.Ping(); err != nil {
 		t.Fatalf("failed to ping database: %v", err)
@@ -40,7 +40,6 @@ func Test_Migrations(t *testing.T) {
 	if count == 0 {
 		t.Fatal("table job_listings does not exist")
 	}
-
 }
 
 func Test_StoreRawData_Upserts(t *testing.T) {
@@ -48,7 +47,7 @@ func Test_StoreRawData_Upserts(t *testing.T) {
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
-	defer db.Close() //nolint:errcheck
+	defer db.Close()
 
 	storage := NewDBStorageService(db)
 	rawData := models.RawData{
@@ -58,7 +57,7 @@ func Test_StoreRawData_Upserts(t *testing.T) {
 	}
 
 	mock.ExpectExec("INSERT INTO raw_data").
-		WithArgs(rawData.URL, rawData.ContentType, string(rawData.Raw_content)).
+		WithArgs(rawData.URL, rawData.ContentType, rawData.Raw_content).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 
 	if err := storage.StoreRawData(rawData); err != nil {
