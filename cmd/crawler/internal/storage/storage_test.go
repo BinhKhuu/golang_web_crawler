@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"database/sql"
 	"golangwebcrawler/cmd/crawler/internal/models"
 	"testing"
 
@@ -9,18 +10,38 @@ import (
 )
 
 // this test is persistant and needs a database to spin up maybe use docker in the tests but for now ignore and comment out
-// func Test_Store(t *testing.T) {
-// 	conStr := "postgres://myuser:mypassword@localhost:5433/jobs_webcrawler?sslmode=disable"
-// 	conn, err := sql.Open("postgres", conStr)
-// 	if err != nil {
-// 		t.Fatalf("failed to open connection: %v", err)
-// 	}
-// 	defer conn.Close()
+func Test_Migrations(t *testing.T) {
+	conStr := "postgres://postgres:postgres@localhost:5432/testdb?sslmode=disable"
+	conn, err := sql.Open("postgres", conStr)
+	if err != nil {
+		t.Fatalf("failed to open connection: %v", err)
+	}
+	defer conn.Close() //nolint:errcheck
 
-// 	if err := conn.Ping(); err != nil {
-// 		t.Fatalf("failed to ping database: %v", err)
-// 	}
-// }
+	if err := conn.Ping(); err != nil {
+		t.Fatalf("failed to ping database: %v", err)
+	}
+
+	var count int
+	err = conn.QueryRow(`SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'raw_data'`).Scan(&count)
+	if err != nil {
+		t.Fatalf("failed to check table existence: %v", err)
+	}
+
+	if count == 0 {
+		t.Fatal("table raw_data does not exist")
+	}
+
+	err = conn.QueryRow(`SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'job_listings'`).Scan(&count)
+	if err != nil {
+		t.Fatalf("failed to check table existence: %v", err)
+	}
+
+	if count == 0 {
+		t.Fatal("table job_listings does not exist")
+	}
+
+}
 
 func Test_StoreRawData_Upserts(t *testing.T) {
 	db, mock, err := sqlmock.New()
