@@ -9,7 +9,7 @@ import (
 	_ "github.com/lib/pq" // postgres driver
 )
 
-// this test is persistant and needs a database to spin up maybe use docker in the tests but for now ignore and comment out
+// Test_Migrations connects to the test database in workflows the credentials are in test.yaml
 func Test_Migrations(t *testing.T) {
 	conStr := "postgres://postgres:postgres@localhost:5432/testdb?sslmode=disable"
 	conn, err := sql.Open("postgres", conStr)

@@ -73,8 +73,7 @@ func processUrl(fetcher Fetcher, startUrl string, parser Parser, storage Storage
 	if err != nil {
 		return nil, err
 	}
-	// todo  this should be storage data model not crawl result datamodel
-	// todo parser should attempt to clean up the raw_content? or should that be a seperate process not related to crawl
+
 	if storage != nil {
 		crawlResult := models.RawData{
 			URL:         startUrl,
@@ -125,8 +124,6 @@ func shouldCrawl(depth int, startUrl string, c *CrawlerState) bool {
 	return true
 }
 
-// todo links like /about should be converted to absolute urls before checking if they are in the allowed domains list
-// /about etc is a link on the same domain so it should be allowed
 func isAllowedDomain(url string, allowedDomains []string) bool {
 	for _, domain := range allowedDomains {
 		if containsDomain(url, domain) {
