@@ -1,0 +1,64 @@
+name: Test and Coverage
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: myuser
+          POSTGRES_PASSWORD: mypassword
+          POSTGRES_DB: jobs_webcrawler
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go 1.25.5
+        uses: actions/setup-go@v5
+        with:
+          go-version: 1.25.5
+
+      - name: Force Go to use local toolchain for code coverage testing
+        run: go env -w GOTOOLCHAIN=local
+
+      - name: Install golang-migrate
+        run: |
+          curl -L https://github.com/golang-migrate/migrate/releases/download/v4.18.1/migrate.linux-amd64.tar.gz | tar xvz
+          sudo mv migrate /usr/local/bin/migrate
+
+      - name: Run migrations
+        run: migrate -verbose -path infra/migrations/scripts -database "postgres://myuser:mypassword@localhost:5433/jobs_webcrawler?sslmode=disable" up
+
+      - name: Run tests
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5433
+          DB_USER: myuser
+          DB_PASSWORD: mypassword
+          DB_NAME: jobs_webcrawler
+        run: go test ./... -v -coverprofile=coverage.out
+
+      - name: Add coverage summary to job summary
+        run: |
+          {
+            echo "## Test Coverage"
+            echo '```'
+            go tool cover -func=coverage.out
+            echo '```'
+          } >> $GITHUB_STEP_SUMMARY

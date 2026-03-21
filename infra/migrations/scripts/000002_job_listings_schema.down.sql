@@ -1,1 +1,1 @@
-drop job_listings;
+DROP TABLE IF EXISTS job_listings;

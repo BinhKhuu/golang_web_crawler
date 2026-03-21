@@ -1,2 +1,2 @@
-DROP TABLE jobs;
-DROP TABLE raw_data;
+DROP TABLE IF EXISTS jobs;
+DROP TABLE IF EXISTS raw_data;
