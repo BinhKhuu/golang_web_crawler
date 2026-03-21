@@ -100,3 +100,9 @@ You’ll see something like:
 
 This tells you exactly which server your psql command is hitting.
 Default port is 5432 this project deliberarly uses 5433 to avoid clashes
+
+# Connect to database on docker
+```
+psql -h localhost -p 5433 -U myuser -d jobs_webcrawler
+
+```
