@@ -12,4 +12,5 @@ func SetTestEnvs(t *testing.T) {
 	t.Setenv("DB_SSLMODE", "disable")
 }
 
+// #nosec G101 -- this is test code, no real credentials
 const ExpectedConnStr = "postgres://myuser:mypassword@localhost:5433/jobs_webcrawler?sslmode=disable"
