@@ -1,8 +1,6 @@
 1. golangci-lint run 
     go through the errors and resolve
-
-4. Go through Todos there are database setups etc to finish
-
+2. Update Test_Migrations update this so the username and passords are the same in local test and workflow test
 5. Parser is parsing links new branch to parse job data when scheudling doing a job crawl
     - the scheudler needs to control the links and which parser is used to store that crawled links data
 

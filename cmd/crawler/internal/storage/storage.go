@@ -1,7 +1,9 @@
 package storage
 
 import (
+	"context"
 	"database/sql"
+	"golangwebcrawler/cmd/crawler/internal/config"
 	"golangwebcrawler/cmd/crawler/internal/models"
 )
 
@@ -14,7 +16,10 @@ func NewDBStorageService(db *sql.DB) *DBStorageService {
 }
 
 func (s *DBStorageService) StoreRawData(result models.RawData) error {
-	_, err := s.DB.Exec(
+	ctx, cancel := context.WithTimeout(context.Background(), config.QueryTimeout)
+	defer cancel()
+	_, err := s.DB.ExecContext(
+		ctx,
 		`INSERT INTO raw_data (url, content_type, raw_content) 
 		VALUES ($1, $2, $3)
 		ON CONFLICT (url) 

@@ -1,7 +1,9 @@
 package storage
 
 import (
+	"context"
 	"database/sql"
+	"golangwebcrawler/cmd/crawler/internal/config"
 	"golangwebcrawler/cmd/crawler/internal/models"
 	"testing"
 
@@ -11,19 +13,23 @@ import (
 
 // Test_Migrations connects to the test database in workflows the credentials are in test.yaml.
 func Test_Migrations(t *testing.T) {
-	conStr := "postgres://postgres:postgres@localhost:5432/testdb?sslmode=disable"
+	// todo update this so the username and passords are the same in local test and workflow test
+	conStr := "postgres://myuser:mypassword@localhost:5433/jobs_webcrawler?sslmode=disable"
+	ctx, cancel := context.WithTimeout(context.Background(), config.QueryTimeout)
 	conn, err := sql.Open("postgres", conStr)
+	defer cancel()
 	if err != nil {
 		t.Fatalf("failed to open connection: %v", err)
 	}
 	defer conn.Close()
 
-	if err := conn.Ping(); err != nil {
-		t.Fatalf("failed to ping database: %v", err)
+	if conErr := conn.PingContext(ctx); conErr != nil {
+		t.Fatalf("failed to ping database: %v", conErr)
 	}
 
 	var count int
-	err = conn.QueryRow(`SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'raw_data'`).Scan(&count)
+	defer cancel()
+	err = conn.QueryRowContext(ctx, `SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'raw_data'`).Scan(&count)
 	if err != nil {
 		t.Fatalf("failed to check table existence: %v", err)
 	}
@@ -32,7 +38,7 @@ func Test_Migrations(t *testing.T) {
 		t.Fatal("table raw_data does not exist")
 	}
 
-	err = conn.QueryRow(`SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'job_listings'`).Scan(&count)
+	err = conn.QueryRowContext(ctx, `SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'job_listings'`).Scan(&count)
 	if err != nil {
 		t.Fatalf("failed to check table existence: %v", err)
 	}

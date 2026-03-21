@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"golangwebcrawler/cmd/crawler/internal/config"
 	"golangwebcrawler/cmd/crawler/internal/crawler"
 	"golangwebcrawler/cmd/crawler/internal/fetcher"
 	"golangwebcrawler/cmd/crawler/internal/parser"
@@ -13,7 +14,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"time"
 
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
@@ -21,13 +21,14 @@ import (
 
 func main() {
 	if err := godotenv.Load("../../.env"); err != nil {
-		log.Fatal("error loading .env file")
+		log.Printf("Error loading .env file: %v\n", err)
+		return
 	}
 
 	maxDepth := 3
 	db, err := setupDatabase()
 	if err != nil {
-		log.Fatalf("failed to set up database: %v", err)
+		log.Printf("error setting up database: %v\n", err)
 		return
 	}
 	defer db.Close()
@@ -42,26 +43,26 @@ func main() {
 
 	err = crawler.CrawlAsync("http://example.com", maxDepth, fetcher, parser, storage)
 	if err != nil {
-		log.Fatalf("failed to crawl: %v", err)
+		log.Printf("error starting crawl: %v\n", err)
 	}
 	crawler.Wait()
 }
 
 func setupDatabase() (*sql.DB, error) {
 	conStr, err := getConnectionString()
+	ctx, cancel := context.WithTimeout(context.Background(), config.QueryTimeout)
+	defer cancel()
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to load database settings: %w", err)
 	}
 	conn, err := sql.Open("postgres", conStr)
 	if err != nil {
-		log.Fatalf("failed to open connection: %v", err)
+		return nil, fmt.Errorf("failed to open database connection: %w", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-
 	if err := conn.PingContext(ctx); err != nil {
-		log.Fatalf("failed to ping database: %v", err)
+		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
 	return conn, nil
