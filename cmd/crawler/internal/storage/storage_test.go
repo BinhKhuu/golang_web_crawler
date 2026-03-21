@@ -4,17 +4,18 @@ import (
 	"context"
 	"database/sql"
 	"golangwebcrawler/cmd/crawler/internal/config"
+	"golangwebcrawler/cmd/crawler/internal/dbhelper"
 	"golangwebcrawler/cmd/crawler/internal/models"
+	"golangwebcrawler/cmd/crawler/internal/testhelpers"
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	_ "github.com/lib/pq" // postgres driver
 )
 
-// Test_Migrations connects to the test database in workflows the credentials are in test.yaml.
 func Test_Migrations(t *testing.T) {
-	// todo update this so the username and passords are the same in local test and workflow test
-	conStr := "postgres://myuser:mypassword@localhost:5433/jobs_webcrawler?sslmode=disable"
+	testhelpers.SetTestEnvs(t)
+	conStr, err := dbhelper.GetConnectionString()
 	ctx, cancel := context.WithTimeout(context.Background(), config.QueryTimeout)
 	conn, err := sql.Open("postgres", conStr)
 	defer cancel()

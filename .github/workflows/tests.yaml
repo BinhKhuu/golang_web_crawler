@@ -48,7 +48,7 @@ jobs:
       - name: Run tests
         env:
           DB_HOST: localhost
-          DB_PORT: 5432
+          DB_PORT: 5433
           DB_USER: myuser
           DB_PASSWORD: mypassword
           DB_NAME: jobs_webcrawler

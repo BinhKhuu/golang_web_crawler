@@ -1,28 +1,20 @@
 package dbhelper
 
 import (
+	"golangwebcrawler/cmd/crawler/internal/testhelpers"
 	"os"
 	"testing"
 )
 
-func setTestEnvs(t *testing.T) {
-	t.Setenv("DB_HOST", "localhost")
-	t.Setenv("DB_PORT", "5432")
-	t.Setenv("DB_USER", "testuser")
-	t.Setenv("DB_PASSWORD", "testpass")
-	t.Setenv("DB_NAME", "testdb")
-	t.Setenv("DB_SSLMODE", "disable")
-}
-
 func Test_GetConnectionString(t *testing.T) {
-	setTestEnvs(t)
+	testhelpers.SetTestEnvs(t)
 
 	conn, err := GetConnectionString()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	expected := "postgres://testuser:testpass@localhost:5432/testdb?sslmode=disable"
+	expected := "postgres://myuser:mypassword@localhost:5433/jobs_webcrawler?sslmode=disable"
 	if conn != expected {
 		t.Errorf("got %s, want %s", conn, expected)
 	}
@@ -36,7 +28,7 @@ func Test_GetConnectionString_MissingEnv(t *testing.T) {
 }
 
 func Test_GetConnectionString_Success(t *testing.T) {
-	setTestEnvs(t)
+	testhelpers.SetTestEnvs(t)
 
 	_, err := GetConnectionString()
 	if err != nil {
@@ -49,7 +41,7 @@ func Test_GetConnectionString_MissingEnvVars(t *testing.T) {
 
 	for _, v := range vars {
 		t.Run("missing_"+v, func(t *testing.T) {
-			setTestEnvs(t)
+			testhelpers.SetTestEnvs(t)
 			os.Unsetenv(v)
 
 			_, err := GetConnectionString()
@@ -61,14 +53,14 @@ func Test_GetConnectionString_MissingEnvVars(t *testing.T) {
 }
 
 func Test_GetConnectionString_Format(t *testing.T) {
-	setTestEnvs(t)
+	testhelpers.SetTestEnvs(t)
 
 	connStr, err := GetConnectionString()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	expected := "postgres://testuser:testpass@localhost:5432/testdb?sslmode=disable"
+	expected := "postgres://myuser:mypassword@localhost:5433/jobs_webcrawler?sslmode=disable"
 	if connStr != expected {
 		t.Errorf("expected connection string '%s', got '%s'", expected, connStr)
 	}

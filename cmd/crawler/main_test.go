@@ -1,18 +1,10 @@
 package main
 
 import (
+	"golangwebcrawler/cmd/crawler/internal/testhelpers"
 	"os"
 	"testing"
 )
-
-func setTestEnvs(t *testing.T) {
-	t.Setenv("DB_HOST", "localhost")
-	t.Setenv("DB_PORT", "5432")
-	t.Setenv("DB_USER", "testuser")
-	t.Setenv("DB_PASSWORD", "testpass")
-	t.Setenv("DB_NAME", "testdb")
-	t.Setenv("DB_SSLMODE", "disable")
-}
 
 func Test_Load(t *testing.T) {
 	cfg, err := Load("./.testenv")
@@ -42,7 +34,7 @@ func Test_Load_FileNotFound(t *testing.T) {
 }
 
 func Test_Load_WithEnvVars(t *testing.T) {
-	setTestEnvs(t)
+	testhelpers.SetTestEnvs(t)
 
 	// Create a temp .env file so Load() doesn't fail on godotenv.Load
 	tmpFile, err := os.CreateTemp("", "test*.env")
@@ -60,8 +52,8 @@ func Test_Load_WithEnvVars(t *testing.T) {
 	if cfg.DBHost != "localhost" {
 		t.Errorf("expected DBHost 'localhost', got '%s'", cfg.DBHost)
 	}
-	if cfg.DBPort != "5432" {
-		t.Errorf("expected DBPort '5432', got '%s'", cfg.DBPort)
+	if cfg.DBPort != "5433" {
+		t.Errorf("expected DBPort '5433', got '%s'", cfg.DBPort)
 	}
 	if cfg.MaxDepth != 3 {
 		t.Errorf("expected MaxDepth 3, got %d", cfg.MaxDepth)
