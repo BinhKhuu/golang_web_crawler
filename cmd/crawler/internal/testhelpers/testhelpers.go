@@ -11,3 +11,5 @@ func SetTestEnvs(t *testing.T) {
 	t.Setenv("DB_NAME", "jobs_webcrawler")
 	t.Setenv("DB_SSLMODE", "disable")
 }
+
+const ExpectedConnStr = "postgres://myuser:mypassword@localhost:5433/jobs_webcrawler?sslmode=disable"

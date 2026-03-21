@@ -14,7 +14,7 @@ func Test_GetConnectionString(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	expected := "postgres://myuser:mypassword@localhost:5433/jobs_webcrawler?sslmode=disable"
+	expected := testhelpers.ExpectedConnStr
 	if conn != expected {
 		t.Errorf("got %s, want %s", conn, expected)
 	}
@@ -60,7 +60,7 @@ func Test_GetConnectionString_Format(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	expected := "postgres://myuser:mypassword@localhost:5433/jobs_webcrawler?sslmode=disable"
+	expected := testhelpers.ExpectedConnStr
 	if connStr != expected {
 		t.Errorf("expected connection string '%s', got '%s'", expected, connStr)
 	}
