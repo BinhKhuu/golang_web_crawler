@@ -37,7 +37,7 @@ func Test_Load_WithEnvVars(t *testing.T) {
 	testhelpers.SetTestEnvs(t)
 
 	// Create a temp .env file so Load() doesn't fail on godotenv.Load
-	tmpFile, err := os.CreateTemp("", "test*.env")
+	tmpFile, err := os.CreateTemp(t.TempDir(), "test*.env")
 	if err != nil {
 		t.Fatalf("failed to create temp file: %v", err)
 	}

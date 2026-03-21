@@ -16,6 +16,9 @@ import (
 func Test_Migrations(t *testing.T) {
 	testhelpers.SetTestEnvs(t)
 	conStr, err := dbhelper.GetConnectionString()
+	if err != nil {
+		t.Fatalf("failed to get connection string: %v", err)
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), config.QueryTimeout)
 	conn, err := sql.Open("postgres", conStr)
 	defer cancel()

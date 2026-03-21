@@ -54,10 +54,11 @@ func Load(envFile string) (*CrawlerConfig, error) {
 		return nil, fmt.Errorf("failed to load env file: %w", err)
 	}
 
+	const maxDepth = 3
 	return &CrawlerConfig{
 		DBHost:         os.Getenv("DB_HOST"),
 		DBPort:         os.Getenv("DB_PORT"),
-		MaxDepth:       3,
+		MaxDepth:       maxDepth,
 		AllowedDomains: []string{"example.com", "iana.org"},
 	}, nil
 }

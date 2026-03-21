@@ -69,5 +69,4 @@ func Test_GetConnectionString_Format(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to get connection string: %v", err)
 	}
-
 }
