@@ -1,3 +1,32 @@
-5. Parser is parsing links new branch to parse job data when scheudling doing a job crawl
-    - the scheudler needs to control the links and which parser is used to store that crawled links data
-8. work on Parsing data into models
+1. Tests for parser factory
+2. Build JobListing Parser
+    - needs to read from db
+    - needs to parse html for job data 
+    - needs to put that data into model 
+    - return data
+
+3. Parsing Scheduler ( does it need an api to kick off maybe this should be in the api and parser to has and api to run types of scheudling like jobs )
+
+Define your models/ structs first (what data do you want to extract?)
+Scaffold internal/parser/ with a Parser interface
+Create cmd/parser/main.go as the entry point
+What kind of data are you crawling? (e.g. articles, products, listings) — that will shape the models.
+
+
+the idea of the parser is that its generic but i suppose thats too hard to implement when you are parsing raw html. should i design it so parser provides an interface and there will be several types of parsers like JobParser, weatherParser, fuelParser
+Yes, that's the right approach. A generic HTML parser is impractical — you always need domain-specific extraction logic. The interface + multiple implementations pattern is clean and extensible.
+
+Suggested design:
+
+The interface would look like:
+
+Or if you want to avoid generics:
+
+Then a ParserRegistry selects the right parser:
+
+This means:
+
+Each parser knows its domain (jobs, weather, fuel)
+CanParse(url) lets the registry auto-select the right parser based on the source URL
+Adding a new site = new model + new parser implementation, nothing else changes
+Want me to scaffold this structure?
