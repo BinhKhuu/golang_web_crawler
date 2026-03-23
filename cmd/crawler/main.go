@@ -3,10 +3,10 @@ package main
 import (
 	"fmt"
 	"golangwebcrawler/cmd/crawler/internal/crawler"
-	"golangwebcrawler/cmd/crawler/internal/dbhelper"
 	"golangwebcrawler/cmd/crawler/internal/fetcher"
 	"golangwebcrawler/cmd/crawler/internal/parser"
 	"golangwebcrawler/cmd/crawler/internal/storage"
+	"golangwebcrawler/internal/db"
 	"log"
 	"net/http"
 	"os"
@@ -22,16 +22,16 @@ func main() {
 		return
 	}
 
-	db, err := dbhelper.SetupDatabase()
+	database, err := db.SetupDatabase()
 	if err != nil {
 		log.Printf("error setting up database: %v\n", err)
 		return
 	}
-	defer db.Close()
+	defer database.Close()
 
 	httpClient := http.DefaultClient
 	crawler := crawler.NewCrawler(cfg.MaxDepth, cfg.AllowedDomains)
-	storage := storage.NewDBStorageService(db)
+	storage := storage.NewDBStorageService(database)
 	parser := parser.NewHTTPParser()
 	fetcher := fetcher.NewHTTPFetcher(httpClient)
 

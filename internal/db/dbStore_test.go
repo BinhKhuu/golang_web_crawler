@@ -1,7 +1,7 @@
-package dbhelper
+package db
 
 import (
-	"golangwebcrawler/cmd/crawler/internal/testhelpers"
+	"golangwebcrawler/internal/testhelpers"
 	"os"
 	"testing"
 )

@@ -4,9 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"golangwebcrawler/cmd/crawler/internal/config"
-	"golangwebcrawler/cmd/crawler/internal/dbhelper"
 	"golangwebcrawler/cmd/crawler/internal/models"
-	"golangwebcrawler/cmd/crawler/internal/testhelpers"
+	"golangwebcrawler/internal/db"
+	"golangwebcrawler/internal/testhelpers"
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
@@ -15,7 +15,7 @@ import (
 
 func Test_Migrations(t *testing.T) {
 	testhelpers.SetTestEnvs(t)
-	conStr, err := dbhelper.GetConnectionString()
+	conStr, err := db.GetConnectionString()
 	if err != nil {
 		t.Fatalf("failed to get connection string: %v", err)
 	}
