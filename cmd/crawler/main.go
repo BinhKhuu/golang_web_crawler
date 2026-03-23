@@ -6,7 +6,8 @@ import (
 	"golangwebcrawler/cmd/crawler/internal/fetcher"
 	"golangwebcrawler/cmd/crawler/internal/parser"
 	"golangwebcrawler/cmd/crawler/internal/storage"
-	"golangwebcrawler/internal/db"
+	"golangwebcrawler/internal/dbstore"
+
 	"log"
 	"net/http"
 	"os"
@@ -22,7 +23,7 @@ func main() {
 		return
 	}
 
-	database, err := db.SetupDatabase()
+	database, err := dbstore.SetupDatabase()
 	if err != nil {
 		log.Printf("error setting up database: %v\n", err)
 		return

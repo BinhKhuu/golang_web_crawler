@@ -1,4 +1,4 @@
-package db
+package dbstore
 
 import (
 	"golangwebcrawler/internal/testhelpers"
@@ -8,7 +8,6 @@ import (
 
 func Test_GetConnectionString(t *testing.T) {
 	testhelpers.SetTestEnvs(t)
-
 	conn, err := GetConnectionString()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

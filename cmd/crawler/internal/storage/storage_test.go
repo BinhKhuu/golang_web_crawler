@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"golangwebcrawler/cmd/crawler/internal/config"
 	"golangwebcrawler/cmd/crawler/internal/models"
-	"golangwebcrawler/internal/db"
+	"golangwebcrawler/internal/dbstore"
 	"golangwebcrawler/internal/testhelpers"
 	"testing"
 
@@ -15,7 +15,7 @@ import (
 
 func Test_Migrations(t *testing.T) {
 	testhelpers.SetTestEnvs(t)
-	conStr, err := db.GetConnectionString()
+	conStr, err := dbstore.GetConnectionString()
 	if err != nil {
 		t.Fatalf("failed to get connection string: %v", err)
 	}
