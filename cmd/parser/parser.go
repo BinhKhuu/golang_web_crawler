@@ -18,11 +18,13 @@ func main() {
 func ParseJobListing(html string) (models.JobListing, error) {
 	p, err := parser.NewParser[models.JobListing]()
 	if err != nil {
-		log.Fatalf("Failed to create parser: %v", err)
+		log.Printf("Failed to create parser: %v", err)
+		return models.JobListing{}, err
 	}
 	j, err := p.Parse(html)
 	if err != nil {
-		log.Fatalf("Failed to parse HTML: %v", err)
+		log.Printf("Failed to parse HTML: %v", err)
+		return models.JobListing{}, err
 	}
 	return j, nil
 }

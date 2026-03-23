@@ -21,7 +21,7 @@ func NewParser[T any]() (Parser[T], error) {
 
 	switch any(zero).(type) {
 	case models.JobListing:
-		p := NewJobListingParser() // type: Parser[models.JobListing]
+		p := NewJobListingParser()
 		if typed, ok := any(p).(Parser[T]); ok {
 			return typed, nil
 		}

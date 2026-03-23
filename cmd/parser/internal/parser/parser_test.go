@@ -14,8 +14,9 @@ func Test_NewParser_JobListing(t *testing.T) {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	typeOfP := any(p).(Parser[models.JobListing])
-	if typeOfP == nil {
+	if _, ok := any(p).(Parser[models.JobListing]); ok {
+		// Successfully casted to Parser[models.JobListing]
+	} else {
 		t.Fatalf("expected type Parser[models.JobListing], got %T", p)
 	}
 }
