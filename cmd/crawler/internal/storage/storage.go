@@ -7,18 +7,18 @@ import (
 	"golangwebcrawler/cmd/crawler/internal/models"
 )
 
-type DBStorageService struct {
-	DB *sql.DB
+type CrawlerStorageService struct {
+	db *sql.DB
 }
 
-func NewDBStorageService(db *sql.DB) *DBStorageService {
-	return &DBStorageService{DB: db}
+func NewDBStorageService(db *sql.DB) *CrawlerStorageService {
+	return &CrawlerStorageService{db: db}
 }
 
-func (s *DBStorageService) StoreRawData(result models.RawData) error {
+func (s *CrawlerStorageService) StoreRawData(result models.RawData) error {
 	ctx, cancel := context.WithTimeout(context.Background(), config.QueryTimeout)
 	defer cancel()
-	_, err := s.DB.ExecContext(
+	_, err := s.db.ExecContext(
 		ctx,
 		`INSERT INTO raw_data (url, content_type, raw_content) 
 		VALUES ($1, $2, $3)

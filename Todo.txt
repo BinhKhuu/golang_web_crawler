@@ -1,6 +1,7 @@
-1. Tests for parser factory
 2. Build JobListing Parser
     - needs to read from db
+        - db moved to parent internal folder and renamed dbstore returns database connection and stores the configuration
+        - storage servcies use composition pattern, if a shared service is need it put it in the global internal folder and define it in your speicilzied structs to share its properties
     - needs to parse html for job data 
     - needs to put that data into model 
     - return data

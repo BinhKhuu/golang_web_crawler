@@ -20,7 +20,7 @@ import (
 )
 
 // Storage.
-var _ crawler.StorageService = (*storage.DBStorageService)(nil)
+var _ crawler.StorageService = (*storage.CrawlerStorageService)(nil)
 
 // Fetcher.
 var _ crawler.Fetcher = (*fetcher.HTTPFetcher)(nil)

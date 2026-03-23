@@ -41,6 +41,7 @@ func main() {
 		log.Printf("error starting crawl: %v\n", err)
 	}
 	crawler.Wait()
+	log.Printf("Crawling completed.")
 }
 
 type CrawlerConfig struct {
