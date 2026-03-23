@@ -6,8 +6,6 @@ import (
 	"golangwebcrawler/cmd/parser/models"
 )
 
-type ParserType int
-
 type Parser[T any] interface {
 	Parse(html string) (T, error)
 }
