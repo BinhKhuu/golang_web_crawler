@@ -1,9 +1,11 @@
 package parser
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
-	"golangwebcrawler/cmd/parser/models"
+	"golangwebcrawler/cmd/parser/internal/storage"
+	"golangwebcrawler/internal/models"
 )
 
 type Parser[T any] interface {
@@ -16,12 +18,12 @@ var (
 )
 
 // Todo Test this, When type does not exist, when type exist but cannot be casted correctly (might be too hard to do) and successful parse.
-func NewParser[T any]() (Parser[T], error) {
+func NewParser[T any](db *sql.DB) (Parser[T], error) {
 	var zero T
-
+	storageService := storage.NewDBStorageService(db) // todo maybe this should be a parameter to newparser
 	switch any(zero).(type) {
 	case models.JobListing:
-		p := NewJobListingParser()
+		p := NewJobListingParser(*storageService)
 		if typed, ok := any(p).(Parser[T]); ok {
 			return typed, nil
 		}

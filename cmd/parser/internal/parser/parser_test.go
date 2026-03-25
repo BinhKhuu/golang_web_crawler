@@ -1,15 +1,21 @@
 package parser
 
 import (
+	"database/sql"
 	"errors"
-	"golangwebcrawler/cmd/parser/models"
+	"golangwebcrawler/internal/models"
 	"testing"
+
+	"github.com/DATA-DOG/go-sqlmock"
 )
 
 type UnsupportedParser struct{}
 
 func Test_NewParser_JobListing(t *testing.T) {
-	p, err := NewParser[models.JobListing]()
+	db, _, dbClose := mockDb()
+	defer dbClose()
+
+	p, err := NewParser[models.JobListing](db)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -22,7 +28,9 @@ func Test_NewParser_JobListing(t *testing.T) {
 }
 
 func Test_NewParser_Unsupported(t *testing.T) {
-	_, err := NewParser[UnsupportedParser]()
+	db, _, dbClose := mockDb()
+	defer dbClose()
+	_, err := NewParser[UnsupportedParser](db)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -31,4 +39,12 @@ func Test_NewParser_Unsupported(t *testing.T) {
 	if !errors.Is(err, expectedErr) {
 		t.Fatalf("expected error %v, got %v", expectedErr, err)
 	}
+}
+
+func mockDb() (*sql.DB, *sqlmock.Sqlmock, func()) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		panic("failed to create mock database: " + err.Error())
+	}
+	return db, &mock, func() { db.Close() }
 }
