@@ -3,8 +3,8 @@ package storage
 import (
 	"context"
 	"database/sql"
-	"golangwebcrawler/cmd/crawler/internal/config"
-	"golangwebcrawler/cmd/crawler/internal/models"
+	"golangwebcrawler/internal/dbstore"
+	"golangwebcrawler/internal/models"
 )
 
 type CrawlerStorageService struct {
@@ -16,7 +16,7 @@ func NewDBStorageService(db *sql.DB) *CrawlerStorageService {
 }
 
 func (s *CrawlerStorageService) StoreRawData(result models.RawData) error {
-	ctx, cancel := context.WithTimeout(context.Background(), config.QueryTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), dbstore.QueryTimeout)
 	defer cancel()
 	_, err := s.db.ExecContext(
 		ctx,

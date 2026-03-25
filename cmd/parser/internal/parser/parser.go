@@ -15,7 +15,7 @@ var (
 	ErrCastingParserType     = errors.New("failed to cast parser to requested type")
 )
 
-// Todo Test this, When type does not exist, when type exist but cannot be casted correctly (might be too hard to do) and successful parse
+// Todo Test this, When type does not exist, when type exist but cannot be casted correctly (might be too hard to do) and successful parse.
 func NewParser[T any]() (Parser[T], error) {
 	var zero T
 

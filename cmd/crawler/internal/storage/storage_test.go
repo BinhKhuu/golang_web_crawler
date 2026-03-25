@@ -4,8 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"golangwebcrawler/cmd/crawler/internal/config"
-	"golangwebcrawler/cmd/crawler/internal/models"
 	"golangwebcrawler/internal/dbstore"
+	"golangwebcrawler/internal/models"
 	"golangwebcrawler/internal/testhelpers"
 	"testing"
 

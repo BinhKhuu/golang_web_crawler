@@ -1,7 +1,8 @@
 package crawler
 
 import (
-	"golangwebcrawler/cmd/crawler/internal/models"
+	crawlerModels "golangwebcrawler/cmd/crawler/internal/models"
+	"golangwebcrawler/internal/models"
 	"log"
 	"net/url"
 	"strings"
@@ -32,7 +33,7 @@ func NewCrawler(maxDepth int, allowedDomains []string) *CrawlerState {
 }
 
 type Fetcher interface {
-	Fetch(url string) (models.FetchResult, error)
+	Fetch(url string) (crawlerModels.FetchResult, error)
 }
 
 type Parser interface {
