@@ -14,6 +14,7 @@ type ParserStorageService struct {
 	db *sql.DB
 }
 
+// Todo return error
 func NewDBStorageService(db *sql.DB) *ParserStorageService {
 	return &ParserStorageService{db: db}
 }

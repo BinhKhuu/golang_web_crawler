@@ -35,7 +35,7 @@ func main() {
 	parser := parser.NewHTTPParser()
 	fetcher := fetcher.NewHTTPFetcher(httpClient)
 
-	err = crawler.CrawlAsync("http://example.com", cfg.MaxDepth, fetcher, parser, storage)
+	err = crawler.CrawlAsync("https://www.seek.com.au/software-engineer-jobs", 1, fetcher, parser, storage)
 	if err != nil {
 		log.Printf("error starting crawl: %v\n", err)
 	}
@@ -60,6 +60,6 @@ func Load(envFile string) (*CrawlerConfig, error) {
 		DBHost:         os.Getenv("DB_HOST"),
 		DBPort:         os.Getenv("DB_PORT"),
 		MaxDepth:       maxDepth,
-		AllowedDomains: []string{"example.com", "iana.org"},
+		AllowedDomains: []string{"seek.com.au"},
 	}, nil
 }

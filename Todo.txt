@@ -1,3 +1,16 @@
+Issue : Can't scrape real sites because of terms of usage etc.
+    practise on fake sites first https://realpython.github.io/fake-jobs/
+    https://www.scrapingbee.com/blog/scraper-sites/
+
+    For Practice: Stick to Specialized models. It teaches you how to inspect the DOM, find unique selectors, and handle specific page layouts.
+    For a Product: Start with a General parser that looks for application/ld+json first. It’s the "cheat code" of web scraping—it gives you clean, structured data (Title, Description, DatePosted) without you having to write site-specific code.
+
+1. Fetcher issue, The current HTTPFetcher uses a simple HTTP GET request which only retrieves the initial HTML. For Single Page Applications (SPAs), JavaScript needs to execute to render the full content. We need to use a headless browser approach.
+    Solution
+    Create a new BrowserFetcher that uses the chromedp package to launch a headless Chrome browser, wait for the page to fully load (including JS execution), then read the rendered HTML body.
+    Keep the existing HTTPFetcher for non-SPA pages.
+    https://github.com/chromedp/chromedp
+
 2. Build JobListing Parser
     - Jobparser needs to all storage to get raw data then parse it somehow
         - test it
@@ -5,28 +18,9 @@
     - needs to put that data into model 
     - return data
 
-3. Parsing Scheduler ( does it need an api to kick off maybe this should be in the api and parser to has and api to run types of scheudling like jobs )
-
-Define your models/ structs first (what data do you want to extract?)
-Scaffold internal/parser/ with a Parser interface
-Create cmd/parser/main.go as the entry point
-What kind of data are you crawling? (e.g. articles, products, listings) — that will shape the models.
+3. Testing
+    - golangwebcrawler/internal/dbstore       3.348s  coverage: 64.5% of statements
 
 
-the idea of the parser is that its generic but i suppose thats too hard to implement when you are parsing raw html. should i design it so parser provides an interface and there will be several types of parsers like JobParser, weatherParser, fuelParser
-Yes, that's the right approach. A generic HTML parser is impractical — you always need domain-specific extraction logic. The interface + multiple implementations pattern is clean and extensible.
+4. Parsing Scheduler ( does it need an api to kick off maybe this should be in the api and parser to has and api to run types of scheudling like jobs )
 
-Suggested design:
-
-The interface would look like:
-
-Or if you want to avoid generics:
-
-Then a ParserRegistry selects the right parser:
-
-This means:
-
-Each parser knows its domain (jobs, weather, fuel)
-CanParse(url) lets the registry auto-select the right parser based on the source URL
-Adding a new site = new model + new parser implementation, nothing else changes
-Want me to scaffold this structure?
