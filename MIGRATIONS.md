@@ -86,7 +86,7 @@ DB_SSLMODE=disable
 export the env values
 
 ``` sh
-$(grep -v '^#' .env | xargs) 
+export $(grep -v '^#' .env | xargs)
 ```
 
 run migration command

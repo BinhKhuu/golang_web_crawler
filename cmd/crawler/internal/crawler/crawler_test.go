@@ -3,7 +3,8 @@ package crawler
 import (
 	"errors"
 	"fmt"
-	"golangwebcrawler/cmd/crawler/internal/models"
+	crawlerModels "golangwebcrawler/cmd/crawler/internal/models"
+	"golangwebcrawler/internal/models"
 	"reflect"
 	"sync"
 	"testing"
@@ -29,8 +30,8 @@ type MockFetchResults struct {
 	Err        error
 }
 
-func (m *MockFetchResults) Fetch(url string) (models.FetchResult, error) {
-	return models.FetchResult{
+func (m *MockFetchResults) Fetch(url string) (crawlerModels.FetchResult, error) {
+	return crawlerModels.FetchResult{
 		URL:        m.URL,
 		StatusCode: m.StatusCode,
 		Body:       m.Body,

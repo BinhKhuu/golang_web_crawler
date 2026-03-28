@@ -1,14 +1,20 @@
-package dbhelper
+package dbstore
 
 import (
 	"context"
 	"database/sql"
 	"errors"
 	"fmt"
-	"golangwebcrawler/cmd/crawler/internal/config"
 	"net"
 	"os"
+	"time"
 )
+
+const QueryTimeout = 5 * time.Second
+
+type DBStorageService struct {
+	DB *sql.DB
+}
 
 func GetConnectionString() (string, error) {
 	dbUser := os.Getenv("DB_USER")
@@ -42,7 +48,7 @@ func GetConnectionString() (string, error) {
 
 func SetupDatabase() (*sql.DB, error) {
 	conStr, err := GetConnectionString()
-	ctx, cancel := context.WithTimeout(context.Background(), config.QueryTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), QueryTimeout)
 	defer cancel()
 
 	if err != nil {

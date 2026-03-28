@@ -3,10 +3,10 @@ package main
 import (
 	"fmt"
 	"golangwebcrawler/cmd/crawler/internal/crawler"
-	"golangwebcrawler/cmd/crawler/internal/dbhelper"
 	"golangwebcrawler/cmd/crawler/internal/fetcher"
 	"golangwebcrawler/cmd/crawler/internal/parser"
 	"golangwebcrawler/cmd/crawler/internal/storage"
+	"golangwebcrawler/internal/dbstore"
 	"log"
 	"net/http"
 	"os"
@@ -22,24 +22,25 @@ func main() {
 		return
 	}
 
-	db, err := dbhelper.SetupDatabase()
+	database, err := dbstore.SetupDatabase()
 	if err != nil {
 		log.Printf("error setting up database: %v\n", err)
 		return
 	}
-	defer db.Close()
+	defer database.Close()
 
 	httpClient := http.DefaultClient
 	crawler := crawler.NewCrawler(cfg.MaxDepth, cfg.AllowedDomains)
-	storage := storage.NewDBStorageService(db)
+	storage := storage.NewDBStorageService(database)
 	parser := parser.NewHTTPParser()
 	fetcher := fetcher.NewHTTPFetcher(httpClient)
 
-	err = crawler.CrawlAsync("http://example.com", cfg.MaxDepth, fetcher, parser, storage)
+	err = crawler.CrawlAsync("https://www.seek.com.au/software-engineer-jobs", 1, fetcher, parser, storage)
 	if err != nil {
 		log.Printf("error starting crawl: %v\n", err)
 	}
 	crawler.Wait()
+	log.Printf("Crawling completed.")
 }
 
 type CrawlerConfig struct {
@@ -59,6 +60,6 @@ func Load(envFile string) (*CrawlerConfig, error) {
 		DBHost:         os.Getenv("DB_HOST"),
 		DBPort:         os.Getenv("DB_PORT"),
 		MaxDepth:       maxDepth,
-		AllowedDomains: []string{"example.com", "iana.org"},
+		AllowedDomains: []string{"seek.com.au"},
 	}, nil
 }

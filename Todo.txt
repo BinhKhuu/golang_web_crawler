@@ -1,3 +1,29 @@
-5. Parser is parsing links new branch to parse job data when scheudling doing a job crawl
-    - the scheudler needs to control the links and which parser is used to store that crawled links data
-8. work on Parsing data into models
+Issue : Can't scrape real sites because of terms of usage etc.
+    practise on fake sites first https://realpython.github.io/fake-jobs/
+    https://www.scrapingbee.com/blog/scraper-sites/
+
+    For Practice: Stick to Specialized models. It teaches you how to inspect the DOM, find unique selectors, and handle specific page layouts.
+    For a Product: Start with a General parser that looks for application/ld+json first. It’s the "cheat code" of web scraping—it gives you clean, structured data (Title, Description, DatePosted) without you having to write site-specific code.
+
+1. Fetcher issue, The current HTTPFetcher uses a simple HTTP GET request which only retrieves the initial HTML. For Single Page Applications (SPAs), JavaScript needs to execute to render the full content. We need to use a headless browser approach.
+    Solution
+    Create a new BrowserFetcher that uses the chromedp package to launch a headless Chrome browser, wait for the page to fully load (including JS execution), then read the rendered HTML body.
+    Keep the existing HTTPFetcher for non-SPA pages.
+    https://github.com/chromedp/chromedp
+
+    1. mimic searching the site as a user programatically
+    
+
+2. Build JobListing Parser
+    - Jobparser needs to all storage to get raw data then parse it somehow
+        - test it
+    - needs to parse html for job data 
+    - needs to put that data into model 
+    - return data
+
+3. Testing
+    - golangwebcrawler/internal/dbstore       3.348s  coverage: 64.5% of statements
+
+
+4. Parsing Scheduler ( does it need an api to kick off maybe this should be in the api and parser to has and api to run types of scheudling like jobs )
+
