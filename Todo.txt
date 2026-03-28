@@ -11,6 +11,9 @@ Issue : Can't scrape real sites because of terms of usage etc.
     Keep the existing HTTPFetcher for non-SPA pages.
     https://github.com/chromedp/chromedp
 
+    1. mimic searching the site as a user programatically
+    
+
 2. Build JobListing Parser
     - Jobparser needs to all storage to get raw data then parse it somehow
         - test it

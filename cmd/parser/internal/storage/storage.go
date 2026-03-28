@@ -14,7 +14,7 @@ type ParserStorageService struct {
 	db *sql.DB
 }
 
-// Todo return error
+// NewDBStorageService Todo return error.
 func NewDBStorageService(db *sql.DB) *ParserStorageService {
 	return &ParserStorageService{db: db}
 }
@@ -47,7 +47,7 @@ func (s *ParserStorageService) GetLatestRawData(startDate time.Time) ([]models.R
 	return results, nil
 }
 
-func (s *ParserStorageService) StoreParsedData(result models.JobListing) error {
+func (s *ParserStorageService) StoreJobListingData(result models.JobListing) error {
 	ctx, cancel := context.WithTimeout(context.Background(), dbstore.QueryTimeout)
 	defer cancel()
 
@@ -57,5 +57,19 @@ func (s *ParserStorageService) StoreParsedData(result models.JobListing) error {
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
 		result.Title, result.Company, result.Location, result.RemoteFlag, result.SalaryMin, result.SalaryMax, result.Currency, result.DescriptionHTML, result.DescriptionText, result.PostedDate, result.ExpiresAt, result.Source, result.SourceID, result.URL, pq.Array(result.Tags), result.RawJSON,
 	)
+	return err
+}
+
+func (s *ParserStorageService) StoreJobCardData(result models.JobCard) error {
+	ctx, cancel := context.WithTimeout(context.Background(), dbstore.QueryTimeout)
+	defer cancel()
+
+	_, err := s.db.ExecContext(
+		ctx,
+		`INSERT INTO job_cards (title, company, location, salary, description, url, link, classification, update_date, scrape_date, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())`,
+		result.Title, result.Company, result.Location, result.Salary, result.Description, result.URL, result.Link, result.Classification, result.UpdateDate, result.ScrapeDate,
+	)
+
 	return err
 }

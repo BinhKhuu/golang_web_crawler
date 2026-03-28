@@ -17,7 +17,6 @@ var (
 	ErrCastingParserType     = errors.New("failed to cast parser to requested type")
 )
 
-// Todo Test this, When type does not exist, when type exist but cannot be casted correctly (might be too hard to do) and successful parse.
 func NewParser[T any](db *sql.DB) (Parser[T], error) {
 	var zero T
 	storageService := storage.NewDBStorageService(db) // todo maybe this should be a parameter to newparser
