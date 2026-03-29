@@ -8,12 +8,21 @@ import (
 )
 
 func getTestData(t *testing.T) (string, []models.JobCard) {
-	content, err := os.ReadFile("./test/testoutput.txt") // Todo move testoutoput.txt to a testdata folder
+	content, err := os.ReadFile("./test/testcard.txt") // Todo move testoutoput.txt to a testdata folder
 	if err != nil {
 		t.Fatalf("Failed to read test data: %v", err)
 	}
 	html := string(content)
 	return html, getExpectedResults()
+}
+
+func Test_ParseJobDataLLM(t *testing.T) {
+	testData, _ := getTestData(t)
+	_, err := ParseJobDataLLM(testData)
+	if err != nil {
+		t.Fatalf("Error parsing job data: %v", err)
+	}
+
 }
 
 func Test_ParseJobData(t *testing.T) {

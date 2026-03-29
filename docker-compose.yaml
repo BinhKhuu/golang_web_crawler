@@ -1,4 +1,3 @@
-version: "1.0"
 
 services:
   postgres:
@@ -19,9 +18,28 @@ services:
       - redis_data:/data
     ports:
       - "6379:6379"
+  
+  # ollama:
+  #   image: ollama/ollama:latest
+  #   container_name: ollama
+  #   ports:
+  #     - "11434:11434"
+  #   volumes:
+  #     - ollama_data:/data
+
+  # ollama-pull-model:
+  #   image: ollama/ollama:latest
+  #   container_name: ollama-pull-model
+  #   volumes:
+  #     - ollama_data:/root/.ollama
+  #   entrypoint: /bin/sh
+  #   command: "-c 'sleep 5; ollama pull llama3.2'"
+  #   depends_on:
+  #     - ollama
 
 volumes:
   postgres_data:
   redis_data:
+  ollama_data:
 
 
