@@ -1,4 +1,7 @@
 todo: 
+    1. Update TEST.md detail how LLM testing should be done
+    1. Move the LLM functionality into a service so its mockable for pipeline testing
+    1. make sure pipelines don't run LLM for testing
     1. Build the LLM parser with one of the defined strategies 
         - LLM testing can't test the output of llm through unit tests have to do structure so that llm service can be mocked
     2. Update crawler to get more speicified data or design a data splitter / organiser to validate the data before feeding it to the LLM for job Parsing

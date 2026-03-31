@@ -16,15 +16,6 @@ func getTestData(t *testing.T) (string, []models.JobCard) {
 	return html, getExpectedResults()
 }
 
-func Test_ParseJobDataLLM(t *testing.T) {
-	testData, _ := getTestData(t)
-	_, err := ParseJobDataLLM(testData)
-	if err != nil {
-		t.Fatalf("Error parsing job data: %v", err)
-	}
-
-}
-
 func Test_ParseJobData(t *testing.T) {
 	testData, expectedResults := getTestData(t)
 	jobs, err := ParseJobDataQuery(testData)

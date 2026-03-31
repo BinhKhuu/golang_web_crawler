@@ -1,0 +1,11 @@
+package models
+
+type JobDetails struct {
+	Title       string   `json:"job_title"`
+	Company     string   `json:"company_name"`
+	Location    string   `json:"location"`
+	Salary      string   `json:"salary_range"`
+	Description string   `json:"description"`
+	Skills      []string `json:"required_skills"`
+	Links       []string `json:"links"`
+}
