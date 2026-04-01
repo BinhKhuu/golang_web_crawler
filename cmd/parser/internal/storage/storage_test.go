@@ -49,7 +49,7 @@ func Test_StoreJobCardData(t *testing.T) {
 	defer db.Close()
 
 	storageService := NewDBStorageService(db)
-	jobCard := models.JobCard{
+	jobCard := models.ScrapedJobData{
 		Title:          "Software Engineer",
 		Company:        "Example Inc",
 		Location:       "Remote",

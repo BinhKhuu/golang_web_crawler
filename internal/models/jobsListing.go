@@ -2,6 +2,7 @@ package models
 
 import "time"
 
+// returned from parser and stored in db
 type JobListing struct {
 	ID              int64
 	Title           string

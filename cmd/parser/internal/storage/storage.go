@@ -60,7 +60,7 @@ func (s *ParserStorageService) StoreJobListingData(result models.JobListing) err
 	return err
 }
 
-func (s *ParserStorageService) StoreJobCardData(result models.JobCard) error {
+func (s *ParserStorageService) StoreJobCardData(result models.ScrapedJobData) error {
 	ctx, cancel := context.WithTimeout(context.Background(), dbstore.QueryTimeout)
 	defer cancel()
 

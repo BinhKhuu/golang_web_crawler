@@ -1,0 +1,75 @@
+package llm
+
+import (
+	"context"
+	"encoding/json"
+	"golangwebcrawler/internal/models"
+	"strings"
+
+	"github.com/ollama/ollama/api"
+)
+
+const model = "mistral:latest"
+const MaxMemoryMBs = 16384
+
+type LLMService struct {
+	ModelName    string
+	maxMemoryMBs int
+	Client       *api.Client
+}
+
+func NewLLMService() (*LLMService, error) {
+	client, err := initLLMConnection()
+	if err != nil {
+		return nil, err
+	}
+
+	return &LLMService{
+		ModelName:    model,
+		maxMemoryMBs: MaxMemoryMBs,
+		Client:       client,
+	}, nil
+}
+
+func initLLMConnection() (*api.Client, error) {
+	client, err := api.ClientFromEnvironment()
+	if err != nil {
+		return nil, err
+	}
+
+	return client, nil
+}
+
+func (l *LLMService) QueryLLM(html string, prompt string) (*models.ExtractedJobData, error) {
+	req := &api.GenerateRequest{
+		Model:  l.ModelName,
+		Prompt: prompt,
+		Options: map[string]any{
+			"num_ctx": MaxMemoryMBs, // This is temporary for THIS specific call only
+		},
+		Stream: new(bool), // Set to false for a single complete response
+	}
+
+	var fullResponse strings.Builder
+
+	err := l.Client.Generate(context.Background(), req, func(resp api.GenerateResponse) error {
+		fullResponse.WriteString(resp.Response)
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	raw := strings.TrimSpace(fullResponse.String())
+	raw = strings.TrimPrefix(raw, "```json")
+	raw = strings.TrimPrefix(raw, "```")
+	raw = strings.TrimSuffix(raw, "```")
+	raw = strings.TrimSpace(raw)
+
+	var job models.ExtractedJobData
+	if err := json.Unmarshal([]byte(raw), &job); err != nil {
+		return nil, err
+	}
+
+	return &job, nil
+}

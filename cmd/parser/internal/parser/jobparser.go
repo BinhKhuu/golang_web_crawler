@@ -1,41 +1,43 @@
 package parser
 
 import (
-	"context"
-	"encoding/json"
 	"golangwebcrawler/cmd/parser/internal/storage"
 	"golangwebcrawler/internal/models"
 	"strings"
-	"time"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/ollama/ollama/api"
 )
+
+type LLMService interface {
+	QueryLLM(html string, prompt string) (*models.ExtractedJobData, error)
+}
 
 type JobListingParser struct {
 	JobListing     models.JobListing
 	RawContent     models.RawData
-	storageService storage.ParserStorageService
+	StorageService *storage.ParserStorageService
+	LLMService     LLMService
 }
 
 func (j *JobListingParser) Parse(html string) (models.JobListing, error) {
 	return j.JobListing, nil
 }
 
-func NewJobListingParser(storage storage.ParserStorageService) Parser[models.JobListing] {
+func NewJobListingParser(storage *storage.ParserStorageService, llmSerivce LLMService) Parser[models.JobListing] {
 	return &JobListingParser{
-		storageService: storage,
+		StorageService: storage,
+		LLMService:     llmSerivce,
 	}
 }
 
 // ParseJobDataQuery uses goquery to parse job data from HTML content. This is a simple implementation and may need to be enhanced to extract more detailed information.
-func ParseJobDataQuery(html string) ([]models.JobCard, error) {
+func ParseJobDataQuery(html string) ([]models.ExtractedJobData, error) {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
 	if err != nil {
-		return []models.JobCard{}, err
+		return []models.ExtractedJobData{}, err
 	}
 
-	listings := []models.JobCard{}
+	listings := []models.ExtractedJobData{}
 	// This is a very basic parsing logic. Depending on the actual HTML structure, you may need to adjust the selectors and extraction logic to get more accurate data.
 	doc.Find("article[data-testid='job-card']").Each(func(i int, s *goquery.Selection) {
 		titleElement := s.Find("a[data-automation='jobTitle']")
@@ -44,13 +46,20 @@ func ParseJobDataQuery(html string) ([]models.JobCard, error) {
 		company := s.Find("a[data-automation='jobCompany']").Text()
 		location := s.Find("[data-automation='jobLocation']").Text()
 		salary := s.Find("[data-automation='jobSalary']").Text()
-		listings = append(listings, models.JobCard{
-			Title:      title,
-			Company:    company,
-			Location:   location,
-			Salary:     salary,
-			Link:       "https://www.seek.com.au" + link,
-			ScrapeDate: time.Now(),
+		description := strings.TrimSpace(s.Find("[data-automation='jobDescription']").Text())
+
+		fullLink := link
+		if strings.HasPrefix(link, "/") {
+			fullLink = "https://www.seek.com.au" + link
+		}
+		listings = append(listings, models.ExtractedJobData{
+			Title:       title,
+			Company:     company,
+			Location:    location,
+			Salary:      salary,
+			Description: description,
+			Links:       []string{fullLink},
+			Skills:      []string{}, // goquery can't extract these, leave empty or parse from description
 		})
 	})
 	return listings, nil
@@ -82,72 +91,19 @@ func cleanHTMLForLLM(rawHTML string) (string, error) {
 }
 
 // ParseJobDataLLM use LLM to parse job data from HTML content. This is a placeholder function and should be implemented with actual LLM logic.
-func ParseJobDataLLM(html string) (models.JobDetails, error) {
+func (j *JobListingParser) ParseJobDataLLM(html string) (models.ExtractedJobData, error) {
 	cleanHTMLForLLM, err := cleanHTMLForLLM(html)
 	if err != nil {
-		return models.JobDetails{}, err
-	}
-
-	client, err := InitLLMConnection(cleanHTMLForLLM)
-	if err != nil {
-		return models.JobDetails{}, err
+		return models.ExtractedJobData{}, err
 	}
 
 	prompt := "Extract the following fields in JSON format: \n\t- job_title\n\t- company_name\n\t- salary_range\n\t- location\n\t- description\n\t- links (as an array)(this is the job advertisement URL, not the company profile or search filter)\n\t- required_skills (as an array)\n\t\n\tText to process: " + html
 
-	jobData, err := QueryLLM(cleanHTMLForLLM, prompt, client)
+	jobData, err := j.LLMService.QueryLLM(cleanHTMLForLLM, prompt)
 	if err != nil {
-		return models.JobDetails{}, err
+		return models.ExtractedJobData{}, err
 	}
 	return *jobData, nil
-}
-
-func InitLLMConnection(html string) (*api.Client, error) {
-	// Connect to the Ollama container's API
-	client, err := api.ClientFromEnvironment()
-	if err != nil {
-		return nil, err
-	}
-
-	return client, nil
-}
-
-// todo think if we need to santise the query string
-// todo for unit testing this should move to a service so we can mock the prompt results.
-func QueryLLM(html string, prompt string, client *api.Client) (*models.JobDetails, error) {
-	const aiModelName = "mistral:latest"
-	const maxMemoryMBs = 16384
-	req := &api.GenerateRequest{
-		Model:  aiModelName,
-		Prompt: prompt,
-		Options: map[string]any{
-			"num_ctx": maxMemoryMBs, // This is temporary for THIS specific call only
-		},
-		Stream: new(bool), // Set to false for a single complete response
-	}
-
-	var fullResponse strings.Builder
-
-	err := client.Generate(context.Background(), req, func(resp api.GenerateResponse) error {
-		fullResponse.WriteString(resp.Response)
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	raw := strings.TrimSpace(fullResponse.String())
-	raw = strings.TrimPrefix(raw, "```json")
-	raw = strings.TrimPrefix(raw, "```")
-	raw = strings.TrimSuffix(raw, "```")
-	raw = strings.TrimSpace(raw)
-
-	var job models.JobDetails
-	if err := json.Unmarshal([]byte(raw), &job); err != nil {
-		return nil, err
-	}
-
-	return &job, nil
 }
 
 // todo figure out if this is needed. It parses data from a html to find links, the goal is to ask the llm get me the links that are related to the domain and looks like a job listing url.

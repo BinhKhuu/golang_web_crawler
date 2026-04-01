@@ -2,7 +2,8 @@ package models
 
 import "time"
 
-type JobCard struct {
+// todo delete this using extractedJobData instead
+type ScrapedJobData struct {
 	ID             string    `json:"id"`             // From data-job-id="91188569"
 	Title          string    `json:"title"`          // From data-automation="jobTitle"
 	Company        string    `json:"company"`        // From data-automation="jobCompany"
