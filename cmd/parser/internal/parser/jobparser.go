@@ -48,17 +48,13 @@ func ParseJobDataQuery(html string) ([]models.ExtractedJobData, error) {
 		salary := s.Find("[data-automation='jobSalary']").Text()
 		description := strings.TrimSpace(s.Find("[data-automation='jobDescription']").Text())
 
-		fullLink := link
-		if strings.HasPrefix(link, "/") {
-			fullLink = "https://www.seek.com.au" + link
-		}
 		listings = append(listings, models.ExtractedJobData{
 			Title:       title,
 			Company:     company,
 			Location:    location,
 			Salary:      salary,
 			Description: description,
-			Links:       []string{fullLink},
+			Link:        link,
 			Skills:      []string{}, // goquery can't extract these, leave empty or parse from description
 		})
 	})
@@ -97,7 +93,7 @@ func (j *JobListingParser) ParseJobDataLLM(html string) (models.ExtractedJobData
 		return models.ExtractedJobData{}, err
 	}
 
-	prompt := "Extract the following fields in JSON format: \n\t- job_title\n\t- company_name\n\t- salary_range\n\t- location\n\t- description\n\t- links (as an array)(this is the job advertisement URL, not the company profile or search filter)\n\t- required_skills (as an array)\n\t\n\tText to process: " + html
+	prompt := "Extract the following fields in JSON format: \n\t- job_title\n\t- company_name\n\t- salary_range\n\t- location\n\t- description\n\t- links (single string if multiple comma separated)(this is the job advertisement URL, not the company profile or search filter)\n\t- required_skills (as an array)\n\t\n\tText to process: " + html
 
 	jobData, err := j.LLMService.QueryLLM(cleanHTMLForLLM, prompt)
 	if err != nil {

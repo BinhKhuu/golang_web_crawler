@@ -1,1 +1,1 @@
-DROP TABLE IF EXISTS job_cards;
+DROP TABLE IF EXISTS extracted_jobdata;

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"golangwebcrawler/internal/dbstore"
 	"golangwebcrawler/internal/models"
+	"strings"
 	"time"
 
 	"github.com/lib/pq"
@@ -60,15 +61,18 @@ func (s *ParserStorageService) StoreJobListingData(result models.JobListing) err
 	return err
 }
 
-func (s *ParserStorageService) StoreJobCardData(result models.ScrapedJobData) error {
+func (s *ParserStorageService) StoreExtractedJobData(result models.ExtractedJobData) error {
 	ctx, cancel := context.WithTimeout(context.Background(), dbstore.QueryTimeout)
 	defer cancel()
 
+	// Convert Skills array to comma-separated string or JSON
+	skills := strings.Join(result.Skills, ",")
+
 	_, err := s.db.ExecContext(
 		ctx,
-		`INSERT INTO job_cards (title, company, location, salary, description, url, link, classification, update_date, scrape_date, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())`,
-		result.Title, result.Company, result.Location, result.Salary, result.Description, result.URL, result.Link, result.Classification, result.UpdateDate, result.ScrapeDate,
+		`INSERT INTO job_cards (title, company, location, salary, description, link, skills)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+		result.Title, result.Company, result.Location, result.Salary, result.Description, result.Link, skills,
 	)
 
 	return err

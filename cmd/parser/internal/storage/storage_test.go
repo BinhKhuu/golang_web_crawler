@@ -3,6 +3,7 @@ package storage
 import (
 	"golangwebcrawler/internal/models"
 	"golangwebcrawler/internal/typeutil"
+	"strings"
 	"testing"
 	"time"
 
@@ -49,23 +50,20 @@ func Test_StoreJobCardData(t *testing.T) {
 	defer db.Close()
 
 	storageService := NewDBStorageService(db)
-	jobCard := models.ScrapedJobData{
-		Title:          "Software Engineer",
-		Company:        "Example Inc",
-		Location:       "Remote",
-		Salary:         "$100k - $150k",
-		Link:           "http://example.com/job/12345/456",
-		URL:            "http://example.com/job/12345",
-		Classification: "SoftwareEngineering",
-		ScrapeDate:     time.Now(),
-		UpdateDate:     time.Now(),
+	jobCard := models.ExtractedJobData{
+		Title:    "Software Engineer",
+		Company:  "Example Inc",
+		Location: "Remote",
+		Salary:   "$100k - $150k",
+		Link:     "https://www.seek.com.au",
 	}
 
+	expectedSkills := strings.Join(jobCard.Skills, ",")
 	mock.ExpectExec("INSERT INTO job_cards").
-		WithArgs(jobCard.Title, jobCard.Company, jobCard.Location, jobCard.Salary, jobCard.Description, jobCard.URL, jobCard.Link, jobCard.Classification, jobCard.UpdateDate, jobCard.ScrapeDate).
+		WithArgs(jobCard.Title, jobCard.Company, jobCard.Location, jobCard.Salary, jobCard.Description, jobCard.Link, expectedSkills).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 
-	if err := storageService.StoreJobCardData(jobCard); err != nil {
+	if err := storageService.StoreExtractedJobData(jobCard); err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 

@@ -8,5 +8,5 @@ type ExtractedJobData struct {
 	Salary      string   `json:"salary_range"`
 	Description string   `json:"description"`
 	Skills      []string `json:"required_skills"`
-	Links       []string `json:"links"`
+	Link        string   `json:"links"`
 }

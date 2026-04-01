@@ -34,7 +34,7 @@ func getExpectedLLMResults() []models.ExtractedJobData {
 			Company:  "Girraphic Park Pty Ltd",
 			Location: "Sydney NSW",
 			Salary:   "$95,000 - $115,000 per year",
-			Links:    []string{"https://www.seek.com.au"},
+			Link:     "https://www.seek.com.au",
 		},
 	}
 }
