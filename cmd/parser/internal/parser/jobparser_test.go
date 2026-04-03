@@ -9,7 +9,11 @@ import (
 
 type mockLLMService struct{}
 
-func (m *mockLLMService) QueryLLM(html string, prompt string) (*models.ExtractedJobData, error) {
+const (
+	testFilePathCard = "./test/testcard.txt"
+)
+
+func (m *mockLLMService) QueryLLM(prompt string) (*models.ExtractedJobData, error) {
 	mockDetails := getMockJobDetails()
 	return &mockDetails, nil
 }
@@ -71,127 +75,148 @@ func getExpectedResults() []models.ExtractedJobData {
 			Company:  "LeasePLUS Team",
 			Location: "Melbourne VIC",
 			Salary:   "",
-			Link:     "https://www.seek.com.au"},
+			Link:     "https://www.seek.com.au",
+		},
 		{
 			Title:    "Software Developer",
 			Company:  "Girraphic Park Pty Ltd",
 			Location: "Sydney NSW",
 			Salary:   "$95,000 – $115,000 per year",
-			Link:     "https://www.seek.com.au"},
+			Link:     "https://www.seek.com.au",
+		},
 		{
 			Title:    "Junior Full Stack Developer (Graduate / 1–2 Years Experience)",
 			Company:  "LeasePLUS Team",
 			Location: "Melbourne VIC",
 			Salary:   "",
-			Link:     "https://www.seek.com.au"},
+			Link:     "https://www.seek.com.au",
+		},
 		{
 			Title:    "Junior-Mid Developers - Open to different tech stacks - C++/TypeScript",
 			Company:  "Round Table Recruitment",
 			Location: "Brisbane QLD",
 			Salary:   "$60,000 – $90,000 per year",
-			Link:     "https://www.seek.com.au"},
+			Link:     "https://www.seek.com.au",
+		},
 		{
 			Title:    "Software Engineer",
 			Company:  "AJQ",
 			Location: "Melbourne VIC",
 			Salary:   "",
-			Link:     "https://www.seek.com.au"},
+			Link:     "https://www.seek.com.au",
+		},
 		{
 			Title:    "Software Engineer",
 			Company:  "Geoscape Australia",
 			Location: "Sydney NSW",
 			Salary:   "$125,000 – $145,000 per year",
-			Link:     "https://www.seek.com.au"},
+			Link:     "https://www.seek.com.au",
+		},
 		{
 			Title:    "Software Engineer",
 			Company:  "Wymac Gaming Solutions",
 			Location: "ClaytonMelbourne VIC",
 			Salary:   "",
-			Link:     "https://www.seek.com.au"},
+			Link:     "https://www.seek.com.au",
+		},
 		{
 			Title:    "Software Engineer",
 			Company:  "Boeing Defence Australia",
 			Location: "Brisbane QLD",
 			Salary:   "Permanent role, annual bonus, employee benefits.",
-			Link:     "https://www.seek.com.au"},
+			Link:     "https://www.seek.com.au",
+		},
 		{
 			Title:    "Software Engineer",
 			Company:  "Real Time",
 			Location: "Melbourne VIC",
 			Salary:   "📍 $180k-$200k base + 25% Bonus",
-			Link:     "https://www.seek.com.au"},
+			Link:     "https://www.seek.com.au",
+		},
 		{
 			Title:    "Junior Software Engineer (Full-Stack) — Python/PHP + React",
 			Company:  "DMA Global",
 			Location: "Sydney NSW",
 			Salary:   "$50,000 – $70,000 per year",
-			Link:     "https://www.seek.com.au"},
+			Link:     "https://www.seek.com.au",
+		},
 		{
 			Title:    "Software Engineer",
 			Company:  "Veracross",
 			Location: "MiamiGold Coast QLD",
 			Salary:   "",
-			Link:     "https://www.seek.com.au"},
+			Link:     "https://www.seek.com.au",
+		},
 		{
 			Title:    "Software Engineer",
 			Company:  "Netbay Internet Pty Ltd",
 			Location: "Box HillMelbourne VIC",
 			Salary:   "$115,000 – $125,000 per year",
-			Link:     "https://www.seek.com.au"},
+			Link:     "https://www.seek.com.au",
+		},
 		{
 			Title:    "Software Engineer",
 			Company:  "Boeing Defence Australia",
 			Location: "Brisbane QLD",
 			Salary:   "Permanent role, generous allowances, annual bonus.",
-			Link:     "https://www.seek.com.au"},
+			Link:     "https://www.seek.com.au",
+		},
 		{
 			Title:    "Software Engineer",
 			Company:  "Maptek Pty Ltd",
 			Location: "GlensideAdelaide SA",
 			Salary:   "",
-			Link:     "https://www.seek.com.au"},
+			Link:     "https://www.seek.com.au",
+		},
 		{
 			Title:    "Software Engineer",
 			Company:  "Chubb Fire and Security Pty Ltd",
 			Location: "ParramattaSydney NSW",
 			Salary:   "",
-			Link:     "https://www.seek.com.au"},
+			Link:     "https://www.seek.com.au",
+		},
 		{
 			Title:    "Software Engineer",
 			Company:  "Energetica",
 			Location: "Melbourne VIC",
 			Salary:   "$100,000 – $125,000 per year",
-			Link:     "https://www.seek.com.au"},
+			Link:     "https://www.seek.com.au",
+		},
 		{
 			Title:    "Software Engineer (Java Backend)",
 			Company:  "P&C Partners Pty Ltd",
 			Location: "Brisbane QLD",
 			Salary:   "Up to $120,000 plus super",
-			Link:     "https://www.seek.com.au"},
+			Link:     "https://www.seek.com.au",
+		},
 		{
 			Title:    "Software Engineer",
 			Company:  "PRA",
 			Location: "Sydney NSW",
 			Salary:   "Up to $650 pd",
-			Link:     "https://www.seek.com.au"},
+			Link:     "https://www.seek.com.au",
+		},
 		{
 			Title:    "Software Engineer",
 			Company:  "Geoscience Australia",
 			Location: "SymonstonCanberra ACT",
 			Salary:   "",
-			Link:     "https://www.seek.com.au"},
+			Link:     "https://www.seek.com.au",
+		},
 		{
 			Title:    "Jnr Full Stack Software Engineer (Vue.js & C#.Net)",
 			Company:  "Task Recruitment",
 			Location: "West EndBrisbane QLD",
 			Salary:   "$70,000 to $90,000 base salary",
-			Link:     "https://www.seek.com.au"},
+			Link:     "https://www.seek.com.au",
+		},
 		{
 			Title:    "Software Engineer",
 			Company:  "GENUS INFRASTRUCTURE PTY LTD",
 			Location: "Perth WA",
 			Salary:   "",
-			Link:     "https://www.seek.com.au"},
+			Link:     "https://www.seek.com.au",
+		},
 	}
 }
 
@@ -212,8 +237,8 @@ func getJobListingService() *JobListingParser {
 	}
 }
 
-func getTestLLMData(t *testing.T) (string, models.ExtractedJobData) {
-	content, err := os.ReadFile("./test/testcard.txt") // Todo move testoutoput.txt to a testdata folder
+func getTestLLMData(t *testing.T, filepath string) (string, models.ExtractedJobData) {
+	content, err := os.ReadFile(filepath) // Todo move testoutoput.txt to a testdata folder
 	if err != nil {
 		t.Fatalf("Failed to read test data: %v", err)
 	}
@@ -222,7 +247,7 @@ func getTestLLMData(t *testing.T) (string, models.ExtractedJobData) {
 
 func Test_ParseJobDataLLM(t *testing.T) {
 	joblistingParser := getJobListingService()
-	testData, expected := getTestLLMData(t)
+	testData, expected := getTestLLMData(t, testFilePathCard)
 	jobDetails, err := joblistingParser.ParseJobDataLLM(testData)
 	if err != nil {
 		t.Fatalf("Error parsing job data: %v", err)
@@ -239,5 +264,27 @@ func Test_ParseJobDataLLM(t *testing.T) {
 	}
 	if normalize(jobDetails.Salary) != normalize(expected.Salary) {
 		t.Errorf("Expected Salary '%s', got '%s'", expected.Salary, jobDetails.Salary)
+	}
+}
+
+func Test_CleanDataForLLM(t *testing.T) {
+	testData, _ := getTestLLMData(t, testFilePathCard)
+	cleanedData, err := cleanHTMLForLLM(testData)
+	if err != nil {
+		t.Fatalf("Error cleaning HTML for LLM: %v", err)
+	}
+
+	if strings.Contains(cleanedData, "\n") {
+		t.Error("Cleaned data should not contain newlines")
+	}
+	if strings.Contains(cleanedData, "\t") {
+		t.Error("Cleaned data should not contain tabs")
+	}
+	if len(cleanedData) >= len(testData) {
+		t.Error("Cleaned data should be shorter than original data")
+	}
+
+	if strings.Contains(cleanedData, "Software Engineer at Tech Company in San Francisco, CA with a salary of $120,000 - $150,000") {
+		t.Errorf("Cleaned data does not match expected output. Got: %s", cleanedData)
 	}
 }

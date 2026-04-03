@@ -1,6 +1,6 @@
 package models
 
-// returne from llm transformed to another model for storage in db
+// ExtractedJobData return from llm transformed to another model for storage in db.
 type ExtractedJobData struct {
 	Title       string   `json:"job_title"`
 	Company     string   `json:"company_name"`

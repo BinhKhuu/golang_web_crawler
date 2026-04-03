@@ -10,12 +10,10 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	// Runs once before all tests
-	if err := godotenv.Load("../../../../.env"); err != nil {
+	if err := godotenv.Load("../../.env"); err != nil {
 		log.Println("No .env file found, falling back to system env")
 	}
 
-	// Run all tests
 	os.Exit(m.Run())
 }
 
@@ -39,28 +37,43 @@ func getExpectedLLMResults() []models.ExtractedJobData {
 	}
 }
 
-// func Test_ParseJobDataLLM(t *testing.T) {
-// 	if os.Getenv("RUN_LLM_TESTS") == "" {
-// 		t.Skip("Skipping: set RUN_LLM_TESTS=1 to run")
-// 	}
+func Test_ParseJobDataLLM(t *testing.T) {
+	if os.Getenv("RUN_LLM_TESTS") == "" {
+		t.Skip("Skipping: set RUN_LLM_TESTS=1 to run")
+	}
 
-// 	joblistingParser := getJobListingService()
-// 	testData, expected := getTestLLMData(t)
-// 	jobDetails, err := joblistingParser.ParseJobDataLLM(testData)
-// 	if err != nil {
-// 		t.Fatalf("Error parsing job data: %v", err)
-// 	}
+	llmService, err := NewLLMService()
+	if err != nil {
+		t.Fatalf("Failed to initialize LLM service: %v", err)
+	}
 
-// 	if jobDetails.Title != expected[0].Title {
-// 		t.Errorf("Expected Title '%s', got '%s'", expected[0].Title, jobDetails.Title)
-// 	}
-// 	if jobDetails.Company != expected[0].Company {
-// 		t.Errorf("Expected Company '%s', got '%s'", expected[0].Company, jobDetails.Company)
-// 	}
-// 	if jobDetails.Location != expected[0].Location {
-// 		t.Errorf("Expected Location '%s', got '%s'", expected[0].Location, jobDetails.Location)
-// 	}
-// 	if normalize(jobDetails.Salary) != normalize(expected[0].Salary) {
-// 		t.Errorf("Expected Salary '%s', got '%s'", expected[0].Salary, jobDetails.Salary)
-// 	}
-// }
+	testData, expected := getTestLLMData(t)
+	// todo fix this prompt there is a + testData at the end its a copy of the query in the jobParser which also needs fixing
+	prompt := `Extract the following fields in JSON format: 
+		- job_title
+		- company_name
+		- salary_range
+		- location
+		- description
+		- links (single string if multiple comma separated)(this is the job advertisement URL, not the company profile or search filter)
+		- required_skills (as an array)
+		
+		Text to process: ` + testData
+
+	jobDetails, err := llmService.QueryLLM(prompt)
+	if err != nil {
+		t.Fatalf("LLM query failed: %v", err)
+	}
+
+	if jobDetails.Title != expected[0].Title {
+		t.Errorf("Expected Title '%s', got '%s'", expected[0].Title, jobDetails.Title)
+	}
+	if jobDetails.Company != expected[0].Company {
+		t.Errorf("Expected Company '%s', got '%s'", expected[0].Company, jobDetails.Company)
+	}
+	if jobDetails.Location != expected[0].Location {
+		t.Errorf("Expected Location '%s', got '%s'", expected[0].Location, jobDetails.Location)
+	}
+
+	// todo add more testing for the other properties
+}

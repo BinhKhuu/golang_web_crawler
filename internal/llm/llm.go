@@ -9,8 +9,10 @@ import (
 	"github.com/ollama/ollama/api"
 )
 
-const model = "mistral:latest"
-const MaxMemoryMBs = 16384
+const (
+	Model        = "mistral:latest"
+	MaxMemoryMBs = 16384
+)
 
 type LLMService struct {
 	ModelName    string
@@ -25,7 +27,7 @@ func NewLLMService() (*LLMService, error) {
 	}
 
 	return &LLMService{
-		ModelName:    model,
+		ModelName:    Model,
 		maxMemoryMBs: MaxMemoryMBs,
 		Client:       client,
 	}, nil
@@ -40,7 +42,7 @@ func initLLMConnection() (*api.Client, error) {
 	return client, nil
 }
 
-func (l *LLMService) QueryLLM(html string, prompt string) (*models.ExtractedJobData, error) {
+func (l *LLMService) QueryLLM(prompt string) (*models.ExtractedJobData, error) {
 	req := &api.GenerateRequest{
 		Model:  l.ModelName,
 		Prompt: prompt,

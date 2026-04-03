@@ -9,7 +9,7 @@ import (
 )
 
 type LLMService interface {
-	QueryLLM(html string, prompt string) (*models.ExtractedJobData, error)
+	QueryLLM(prompt string) (*models.ExtractedJobData, error)
 }
 
 type JobListingParser struct {
@@ -61,20 +61,16 @@ func ParseJobDataQuery(html string) ([]models.ExtractedJobData, error) {
 	return listings, nil
 }
 
-// todo test this.
 func cleanHTMLForLLM(rawHTML string) (string, error) {
-	// Load the HTML document
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(rawHTML))
 	if err != nil {
 		return "", err
 	}
 
-	// Remove noise tags
 	doc.Find("script, style, nav, footer, iframe, noscript").Each(func(i int, s *goquery.Selection) {
 		s.Remove()
 	})
 
-	// Normalize text content
 	var cleanedLines []string
 	for line := range strings.SplitSeq(strings.ReplaceAll(doc.Text(), "\r\n", "\n"), "\n") {
 		trimmed := strings.TrimSpace(line)
@@ -93,9 +89,18 @@ func (j *JobListingParser) ParseJobDataLLM(html string) (models.ExtractedJobData
 		return models.ExtractedJobData{}, err
 	}
 
-	prompt := "Extract the following fields in JSON format: \n\t- job_title\n\t- company_name\n\t- salary_range\n\t- location\n\t- description\n\t- links (single string if multiple comma separated)(this is the job advertisement URL, not the company profile or search filter)\n\t- required_skills (as an array)\n\t\n\tText to process: " + html
+	prompt := `Extract the following fields in JSON format: 
+		- job_title
+		- company_name
+		- salary_range
+		- location
+		- description
+		- links (single string if multiple comma separated)(this is the job advertisement URL, not the company profile or search filter)
+		- required_skills (as an array)
+		
+	Text to process: ` + cleanHTMLForLLM
 
-	jobData, err := j.LLMService.QueryLLM(cleanHTMLForLLM, prompt)
+	jobData, err := j.LLMService.QueryLLM(prompt)
 	if err != nil {
 		return models.ExtractedJobData{}, err
 	}
@@ -115,7 +120,8 @@ func getPotentialJobLinks(rawHTML string, baseURL string) []string {
 		// and they are almost never "privacy", "terms", or "contact"
 		isNoise := strings.Contains(text, "privacy") || strings.Contains(text, "terms")
 
-		if !isNoise && (len(href) > 10) {
+		const noiseLimit = 10
+		if !isNoise && (len(href) > noiseLimit) {
 			// Resolve relative URLs
 			if strings.HasPrefix(href, "/") {
 				href = baseURL + href
