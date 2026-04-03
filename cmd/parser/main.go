@@ -34,14 +34,18 @@ func ParseJobListing(html string, db *sql.DB) (models.JobListing, error) {
 	p, err := parser.NewParser[models.JobListing](db)
 	if err != nil {
 		log.Printf("Failed to create parser: %v", err)
-		return models.JobListing{}, err
+		// testing data not finished
+		return models.JobListing{
+			Title: "Error",
+		}, err
 	}
-	j, err := p.Parse(html)
+	j, err := p.ParseLLM(html)
 	if err != nil {
 		log.Printf("Failed to parse HTML: %v", err)
 		return models.JobListing{}, err
 	}
-	return j, nil
+	log.Printf("Parsed Job Data: %+v", j)
+	return models.JobListing{}, nil
 }
 
 func Load(envFile string) error {

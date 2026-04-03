@@ -9,7 +9,7 @@ import (
 )
 
 type LLMService interface {
-	QueryLLM(prompt string) (*models.ExtractedJobData, error)
+	QueryLLM(prompt string) ([]models.ExtractedJobData, error)
 }
 
 type JobListingParser struct {
@@ -19,8 +19,14 @@ type JobListingParser struct {
 	LLMService     LLMService
 }
 
-func (j *JobListingParser) Parse(html string) (models.JobListing, error) {
-	return j.JobListing, nil
+func (j *JobListingParser) ParseQuery(html string) ([]models.ExtractedJobData, error) {
+	d, err := ParseJobDataQuery(html)
+	return d, err
+}
+
+func (j *JobListingParser) ParseLLM(html string) ([]models.ExtractedJobData, error) {
+	d, err := j.ParseJobDataLLM(html)
+	return d, err
 }
 
 func NewJobListingParser(storage *storage.ParserStorageService, llmSerivce LLMService) Parser[models.JobListing] {
@@ -83,13 +89,13 @@ func cleanHTMLForLLM(rawHTML string) (string, error) {
 }
 
 // ParseJobDataLLM use LLM to parse job data from HTML content. This is a placeholder function and should be implemented with actual LLM logic.
-func (j *JobListingParser) ParseJobDataLLM(html string) (models.ExtractedJobData, error) {
+func (j *JobListingParser) ParseJobDataLLM(html string) ([]models.ExtractedJobData, error) {
 	cleanHTMLForLLM, err := cleanHTMLForLLM(html)
 	if err != nil {
-		return models.ExtractedJobData{}, err
+		return []models.ExtractedJobData{}, err
 	}
 
-	prompt := `Extract the following fields in JSON format: 
+	prompt := `Forget Previous prompt Extract the following fields in JSON format: 
 		- job_title
 		- company_name
 		- salary_range
@@ -98,36 +104,18 @@ func (j *JobListingParser) ParseJobDataLLM(html string) (models.ExtractedJobData
 		- links (single string if multiple comma separated)(this is the job advertisement URL, not the company profile or search filter)
 		- required_skills (as an array)
 		
-	Text to process: ` + cleanHTMLForLLM
+		IF you cannot parse the input or find the job_title and links return this text 'I am an idiot'. DO NOT ATTEMPT TO RETURN ANYTHING ELSE, NOT EVEN AN EMPTY JSON ARRAY, JUST THIS TEXT.
+		IF you do find job_title and links the returned result should be an array of JSON objects  mark the JSON with` + "```json```" +
+		`at the end of the JSON to make it easier to parse in the code
+		Text to process: ` + cleanHTMLForLLM
 
 	jobData, err := j.LLMService.QueryLLM(prompt)
 	if err != nil {
-		return models.ExtractedJobData{}, err
+		return []models.ExtractedJobData{}, err
 	}
-	return *jobData, nil
+	return jobData, nil
 }
 
-// todo figure out if this is needed. It parses data from a html to find links, the goal is to ask the llm get me the links that are related to the domain and looks like a job listing url.
-func getPotentialJobLinks(rawHTML string, baseURL string) []string {
-	var links []string
-	doc, _ := goquery.NewDocumentFromReader(strings.NewReader(rawHTML))
-
-	doc.Find("a[href]").Each(func(i int, s *goquery.Selection) {
-		href, _ := s.Attr("href")
-		text := strings.ToLower(s.Text())
-
-		// Heuristic: Job links usually have "view", "details", or are long IDs
-		// and they are almost never "privacy", "terms", or "contact"
-		isNoise := strings.Contains(text, "privacy") || strings.Contains(text, "terms")
-
-		const noiseLimit = 10
-		if !isNoise && (len(href) > noiseLimit) {
-			// Resolve relative URLs
-			if strings.HasPrefix(href, "/") {
-				href = baseURL + href
-			}
-			links = append(links, href)
-		}
-	})
-	return links
+func (j *JobListingParser) StoreExtractedJobData(jobData models.ExtractedJobData) error {
+	return j.StorageService.StoreExtractedJobData(jobData)
 }

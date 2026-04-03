@@ -3,7 +3,9 @@ package llm
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"golangwebcrawler/internal/models"
+	"regexp"
 	"strings"
 
 	"github.com/ollama/ollama/api"
@@ -13,6 +15,8 @@ const (
 	Model        = "mistral:latest"
 	MaxMemoryMBs = 16384
 )
+
+var ErrNoJson = errors.New("no JSON block found in LLM response")
 
 type LLMService struct {
 	ModelName    string
@@ -42,7 +46,7 @@ func initLLMConnection() (*api.Client, error) {
 	return client, nil
 }
 
-func (l *LLMService) QueryLLM(prompt string) (*models.ExtractedJobData, error) {
+func (l *LLMService) QueryLLM(prompt string) ([]models.ExtractedJobData, error) {
 	req := &api.GenerateRequest{
 		Model:  l.ModelName,
 		Prompt: prompt,
@@ -62,16 +66,32 @@ func (l *LLMService) QueryLLM(prompt string) (*models.ExtractedJobData, error) {
 		return nil, err
 	}
 
-	raw := strings.TrimSpace(fullResponse.String())
-	raw = strings.TrimPrefix(raw, "```json")
-	raw = strings.TrimPrefix(raw, "```")
-	raw = strings.TrimSuffix(raw, "```")
-	raw = strings.TrimSpace(raw)
+	// 1. Extract the JSON block using Regex
+	re := regexp.MustCompile("(?s)```json\n?(.*?)\n?```")
+	message := fullResponse.String()
+	match := re.FindStringSubmatch(message)
+	if len(match) > 1 {
+		jsonStr := match[1]
+		raw := strings.TrimSpace(jsonStr)
+		raw = strings.TrimPrefix(raw, "```json")
+		raw = strings.TrimPrefix(raw, "```")
+		raw = strings.TrimSuffix(raw, "```")
+		raw = strings.TrimSpace(raw)
 
-	var job models.ExtractedJobData
-	if err := json.Unmarshal([]byte(raw), &job); err != nil {
-		return nil, err
+		if raw == "" {
+			return []models.ExtractedJobData{}, nil
+		}
+		var job []models.ExtractedJobData
+		if err := json.Unmarshal([]byte(raw), &job); err != nil {
+			return nil, err
+		}
+
+		if len(job) == 0 {
+			return []models.ExtractedJobData{}, ErrNoJson
+		}
+
+		return job, nil
+	} else {
+		return nil, ErrNoJson
 	}
-
-	return &job, nil
 }

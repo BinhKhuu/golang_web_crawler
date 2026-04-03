@@ -13,9 +13,9 @@ const (
 	testFilePathCard = "./test/testcard.txt"
 )
 
-func (m *mockLLMService) QueryLLM(prompt string) (*models.ExtractedJobData, error) {
+func (m *mockLLMService) QueryLLM(prompt string) ([]models.ExtractedJobData, error) {
 	mockDetails := getMockJobDetails()
-	return &mockDetails, nil
+	return []models.ExtractedJobData{mockDetails}, nil
 }
 
 func getTestData(t *testing.T) (string, []models.ExtractedJobData) {
@@ -253,17 +253,17 @@ func Test_ParseJobDataLLM(t *testing.T) {
 		t.Fatalf("Error parsing job data: %v", err)
 	}
 
-	if jobDetails.Title != expected.Title {
-		t.Errorf("Expected Title '%s', got '%s'", expected.Title, jobDetails.Title)
+	if jobDetails[0].Title != expected.Title {
+		t.Errorf("Expected Title '%s', got '%s'", expected.Title, jobDetails[0].Title)
 	}
-	if jobDetails.Company != expected.Company {
-		t.Errorf("Expected Company '%s', got '%s'", expected.Company, jobDetails.Company)
+	if jobDetails[0].Company != expected.Company {
+		t.Errorf("Expected Company '%s', got '%s'", expected.Company, jobDetails[0].Company)
 	}
-	if jobDetails.Location != expected.Location {
-		t.Errorf("Expected Location '%s', got '%s'", expected.Location, jobDetails.Location)
+	if jobDetails[0].Location != expected.Location {
+		t.Errorf("Expected Location '%s', got '%s'", expected.Location, jobDetails[0].Location)
 	}
-	if normalize(jobDetails.Salary) != normalize(expected.Salary) {
-		t.Errorf("Expected Salary '%s', got '%s'", expected.Salary, jobDetails.Salary)
+	if normalize(jobDetails[0].Salary) != normalize(expected.Salary) {
+		t.Errorf("Expected Salary '%s', got '%s'", expected.Salary, jobDetails[0].Salary)
 	}
 }
 

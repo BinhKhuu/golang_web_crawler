@@ -7,6 +7,13 @@ full integration testing locally when needed.
 
 ---
 
+## Testing LLMS
+assume LLM will return something because it likes to talk and make up data or give examples
+e.g. 
+"<html><body><h1>Sample Job Listing</h1></body></html>" will return no results because it can't find jobdata here but it will tell you about it
+"Sample Job Listing<" will return results and make some assumptions like links = SampleJoblisting.com
+
+
 ## Test Categories
 
 ### Unit Tests
@@ -65,5 +72,7 @@ func TestMain(m *testing.M) {
     os.Exit(m.Run())
 }
 ```
+
+
 
 ## TODO how to test locally with docker and ollama

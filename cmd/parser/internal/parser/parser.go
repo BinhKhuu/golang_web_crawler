@@ -10,7 +10,8 @@ import (
 )
 
 type Parser[T any] interface {
-	Parse(html string) (T, error)
+	ParseLLM(html string) ([]models.ExtractedJobData, error)
+	ParseQuery(html string) ([]models.ExtractedJobData, error)
 }
 
 var (
