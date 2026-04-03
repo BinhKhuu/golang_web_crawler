@@ -287,4 +287,10 @@ func Test_CleanDataForLLM(t *testing.T) {
 	if strings.Contains(cleanedData, "Software Engineer at Tech Company in San Francisco, CA with a salary of $120,000 - $150,000") {
 		t.Errorf("Cleaned data does not match expected output. Got: %s", cleanedData)
 	}
+
+	if strings.Contains(cleanedData, "<script>") || strings.Contains(cleanedData, "<style>") ||
+		strings.Contains(cleanedData, "<nav>") || strings.Contains(cleanedData, "<footer>") ||
+		strings.Contains(cleanedData, "<iframe>") || strings.Contains(cleanedData, "<noscript>") {
+		t.Error("Cleaned data should not contain script or style tags")
+	}
 }
