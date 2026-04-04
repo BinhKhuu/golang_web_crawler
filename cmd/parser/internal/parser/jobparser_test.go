@@ -232,8 +232,7 @@ func getMockJobDetails() models.ExtractedJobData {
 func getJobListingService() *JobListingParser {
 	mockLLMService := &mockLLMService{}
 	return &JobListingParser{
-		StorageService: nil,            // You can mock this if needed
-		LLMService:     mockLLMService, // You can mock this if needed
+		LLMService: mockLLMService, // You can mock this if needed
 	}
 }
 

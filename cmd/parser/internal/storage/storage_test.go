@@ -42,7 +42,7 @@ func Test_GetLatestRawData_ReturnsRawData(t *testing.T) {
 	}
 }
 
-func Test_StoreJobCardData(t *testing.T) {
+func Test_StoreExtractedJobDataBatch(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
@@ -50,25 +50,38 @@ func Test_StoreJobCardData(t *testing.T) {
 	defer db.Close()
 
 	storageService := NewDBStorageService(db)
-	jobCard := models.ExtractedJobData{
-		Title:    "Software Engineer",
-		Company:  "Example Inc",
-		Location: "Remote",
-		Salary:   "$100k - $150k",
-		Link:     "https://www.seek.com.au",
+	jobCards := []models.ExtractedJobData{
+		{
+			Title:    "Software Engineer",
+			Company:  "Example Inc",
+			Location: "Remote",
+			Salary:   "$100k - $150k",
+			Link:     "https://www.seek.com.au/job1",
+			Skills:   []string{"Go", "Docker"},
+		},
+		{
+			Title:    "Backend Developer",
+			Company:  "Tech Corp",
+			Location: "New York, NY",
+			Salary:   "$120k - $170k",
+			Link:     "https://www.seek.com.au/job2",
+			Skills:   []string{"Python", "AWS"},
+		},
 	}
+	mock.ExpectBegin()
 
-	expectedSkills := strings.Join(jobCard.Skills, ",")
-	mock.ExpectExec("INSERT INTO job_cards").
-		WithArgs(jobCard.Title, jobCard.Company, jobCard.Location, jobCard.Salary, jobCard.Description, jobCard.Link, expectedSkills).
-		WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectPrepare(`COPY "extracted_jobdata" \("title", "company", "location", "salary", "description", "link", "skills"\) FROM STDIN`)
 
-	if err := storageService.StoreExtractedJobData(jobCard); err != nil {
+	for _, jobCard := range jobCards {
+		expectedSkills := strings.Join(jobCard.Skills, ",")
+		mock.ExpectExec(`COPY "extracted_jobdata"`).
+			WithArgs(jobCard.Title, jobCard.Company, jobCard.Location, jobCard.Salary, jobCard.Description, jobCard.Link, expectedSkills).
+			WillReturnResult(sqlmock.NewResult(0, 1))
+	}
+	mock.ExpectCommit()
+
+	if err := storageService.StoreExtractedJobDataBatch(jobCards); err != nil {
 		t.Fatalf("expected no error, got %v", err)
-	}
-
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("there were unfulfilled expectations: %s", err)
 	}
 }
 

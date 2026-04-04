@@ -49,7 +49,7 @@ func Test_ParseJobDataLLM(t *testing.T) {
 
 	testData, expected := getTestLLMData(t)
 	// todo fix this prompt there is a + testData at the end its a copy of the query in the jobParser which also needs fixing
-	prompt := `Forget Previous prompt Extract the following fields in JSON format: 
+	prompt := `/no_think Forget Previous prompt Extract the following fields in JSON format: 
 		- job_title
 		- company_name
 		- salary_range
@@ -93,7 +93,7 @@ func Test_ParseJobDataLLM_ReturnEmptyJsonWhenNoMatch(t *testing.T) {
 
 	testData := "<html><body><h1>Sample Job Listing</h1></body></html>"
 	// todo fix this prompt there is a + testData at the end its a copy of the query in the jobParser which also needs fixing
-	prompt := `Forget Previous prompt Extract the following fields in JSON format: 
+	prompt := `/no_think Forget Previous prompt Extract the following fields in JSON format: 
 		- job_title
 		- company_name
 		- salary_range
@@ -129,7 +129,7 @@ func Test_ParseJobDataLLM_AttemptsToFillInJsonObject(t *testing.T) {
 
 	testData := "Sample Job Listing"
 	// todo fix this prompt there is a + testData at the end its a copy of the query in the jobParser which also needs fixing
-	prompt := `Forget Previous prompt Extract the following fields in JSON format: 
+	prompt := `/no_think Forget Previous prompt Extract the following fields in JSON format: 
 		- job_title
 		- company_name
 		- salary_range

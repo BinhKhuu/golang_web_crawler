@@ -4,9 +4,11 @@ import (
 	"database/sql"
 	"fmt"
 	"golangwebcrawler/cmd/parser/internal/parser"
+	"golangwebcrawler/cmd/parser/internal/storage"
 	"golangwebcrawler/internal/dbstore"
 	"golangwebcrawler/internal/models"
 	"log"
+	"os"
 
 	"github.com/joho/godotenv"
 )
@@ -21,16 +23,24 @@ func main() {
 
 	db, err := InitDb()
 	if err != nil {
-		log.Fatalf("Failed to initialize database: %v", err)
+		log.Printf("Failed to initialize database: %v", err)
 	}
-	j, err := ParseJobListing("<html><body><h1>Sample Job Listing</h1></body></html>", db)
+	defer db.Close()
+
+	htmlContent, err := os.ReadFile("./internal/parser/test/testcard.txt")
 	if err != nil {
-		log.Fatalf("Failed to parse job listing: %v", err)
+		log.Printf("Failed to read testcard.txt: %v", err)
+	}
+
+	j, err := ParseJobListing(string(htmlContent), db)
+	if err != nil {
+		log.Printf("Failed to parse job listing: %v", err)
 	}
 	log.Printf("Parsed Job Listing: %+v", j)
 }
 
 func ParseJobListing(html string, db *sql.DB) (models.JobListing, error) {
+	storageService := storage.NewDBStorageService(db)
 	p, err := parser.NewParser[models.JobListing](db)
 	if err != nil {
 		log.Printf("Failed to create parser: %v", err)
@@ -42,6 +52,14 @@ func ParseJobListing(html string, db *sql.DB) (models.JobListing, error) {
 	j, err := p.ParseLLM(html)
 	if err != nil {
 		log.Printf("Failed to parse HTML: %v", err)
+		return models.JobListing{}, err
+	}
+
+	// don't need to check if results are empty the parser should return an error if no results could be parsed.
+
+	err = storageService.StoreExtractedJobDataBatch(j)
+	if err != nil {
+		log.Printf("Failed to store extracted job data: %v", err)
 		return models.JobListing{}, err
 	}
 	log.Printf("Parsed Job Data: %+v", j)

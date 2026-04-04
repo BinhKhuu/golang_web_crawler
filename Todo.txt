@@ -1,4 +1,7 @@
 todo: 
+    1. Store Parse data
+        unit test bulk storage
+        jobparser does not need a storage service because its not storing that data just returning parse data
     1. figure out what the model for extract_jobdata should look like and how to map it to joblisting if needed 
         what is joblisting model used for? should joblisting be the thing thats stored and extract_data be the thing that transform into joblisting
     1. make sure pipelines don't run LLM for testing

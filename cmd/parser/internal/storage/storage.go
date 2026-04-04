@@ -3,8 +3,10 @@ package storage
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"golangwebcrawler/internal/dbstore"
 	"golangwebcrawler/internal/models"
+	"log"
 	"strings"
 	"time"
 
@@ -61,19 +63,48 @@ func (s *ParserStorageService) StoreJobListingData(result models.JobListing) err
 	return err
 }
 
-func (s *ParserStorageService) StoreExtractedJobData(result models.ExtractedJobData) error {
+func (s *ParserStorageService) StoreExtractedJobDataBatch(results []models.ExtractedJobData) error {
+	if len(results) == 0 {
+		return nil
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), dbstore.QueryTimeout)
 	defer cancel()
 
-	// Convert Skills array to comma-separated string or JSON
-	skills := strings.Join(result.Skills, ",")
+	txn, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		rollbackErr := txn.Rollback()
+		if rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) {
+			// Log the rollback error if it's not because the transaction is already committed
+			log.Printf("Failed to rollback transaction: %v", err)
+			return
+		}
+	}()
 
-	_, err := s.db.ExecContext(
-		ctx,
-		`INSERT INTO job_cards (title, company, location, salary, description, link, skills)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-		result.Title, result.Company, result.Location, result.Salary, result.Description, result.Link, skills,
-	)
+	stmt, err := txn.PrepareContext(ctx, pq.CopyIn("extracted_jobdata",
+		"title", "company", "location", "salary", "description", "link", "skills"))
+	if err != nil {
+		return err
+	}
 
-	return err
+	for _, result := range results {
+		skills := strings.Join(result.Skills, ",")
+		_, err = stmt.ExecContext(ctx, result.Title, result.Company, result.Location,
+			result.Salary, result.Description, result.Link, skills)
+		if err != nil {
+			return err
+		}
+	}
+
+	defer func() {
+		if err = stmt.Close(); err != nil {
+			log.Printf("Failed to close statement: %v", err)
+			return
+		}
+	}()
+
+	return txn.Commit()
 }

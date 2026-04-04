@@ -7,6 +7,23 @@
 
 1. ollama list
 
+# Ollama model comparision
+1. mistral:latest
+	- this is the fastest model so far for data extraction
+2. qwen3.5:latest
+	- this is the slowest model so far for data extraction
+	- resource intensive 
+	- results not as accurate as mistral
+
+# Setting model in in application
+internal/llm/llm.go
+
+``` go
+const (
+	Model        = "mistral:latest"
+	MaxMemoryMBs = 16384
+)
+```
 
 # ollama golang package new port 
 The official Ollama Go package provides a NewClient function that allows you to explicitly specify the host and port without relying on environment variables. 

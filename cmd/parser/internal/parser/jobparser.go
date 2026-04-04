@@ -29,10 +29,9 @@ func (j *JobListingParser) ParseLLM(html string) ([]models.ExtractedJobData, err
 	return d, err
 }
 
-func NewJobListingParser(storage *storage.ParserStorageService, llmSerivce LLMService) Parser[models.JobListing] {
+func NewJobListingParser(llmSerivce LLMService) Parser[models.JobListing] {
 	return &JobListingParser{
-		StorageService: storage,
-		LLMService:     llmSerivce,
+		LLMService: llmSerivce,
 	}
 }
 
@@ -90,12 +89,12 @@ func cleanHTMLForLLM(rawHTML string) (string, error) {
 
 // ParseJobDataLLM use LLM to parse job data from HTML content. This is a placeholder function and should be implemented with actual LLM logic.
 func (j *JobListingParser) ParseJobDataLLM(html string) ([]models.ExtractedJobData, error) {
-	cleanHTMLForLLM, err := cleanHTMLForLLM(html)
+	_, err := cleanHTMLForLLM(html)
 	if err != nil {
 		return []models.ExtractedJobData{}, err
 	}
 
-	prompt := `Forget Previous prompt Extract the following fields in JSON format: 
+	prompt := `/no_think Forget Previous prompt Extract the following fields in JSON format: 
 		- job_title
 		- company_name
 		- salary_range
@@ -107,15 +106,11 @@ func (j *JobListingParser) ParseJobDataLLM(html string) ([]models.ExtractedJobDa
 		IF you cannot parse the input or find the job_title and links return this text 'I am an idiot'. DO NOT ATTEMPT TO RETURN ANYTHING ELSE, NOT EVEN AN EMPTY JSON ARRAY, JUST THIS TEXT.
 		IF you do find job_title and links the returned result should be an array of JSON objects  mark the JSON with` + "```json```" +
 		`at the end of the JSON to make it easier to parse in the code
-		Text to process: ` + cleanHTMLForLLM
+		Text to process: ` + html
 
 	jobData, err := j.LLMService.QueryLLM(prompt)
 	if err != nil {
 		return []models.ExtractedJobData{}, err
 	}
 	return jobData, nil
-}
-
-func (j *JobListingParser) StoreExtractedJobData(jobData models.ExtractedJobData) error {
-	return j.StorageService.StoreExtractedJobData(jobData)
 }
