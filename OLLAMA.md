@@ -8,8 +8,10 @@
 1. ollama list
 
 # Ollama model comparision
+1. gemma4 
+	- this is the fastest model that produces the most consistent result so far
 1. mistral:latest
-	- this is the fastest model so far for data extraction
+	- this is the seoncd fastest model so far for data extraction
 2. qwen3.5:latest
 	- this is the slowest model so far for data extraction
 	- resource intensive 

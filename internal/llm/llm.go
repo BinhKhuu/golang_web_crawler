@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	Model        = "mistral:latest"
+	Model        = "gemma4"
 	MaxMemoryMBs = 16384
 )
 

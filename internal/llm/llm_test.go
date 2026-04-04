@@ -144,11 +144,11 @@ func Test_ParseJobDataLLM_AttemptsToFillInJsonObject(t *testing.T) {
 		Text to process: ` + testData
 
 	jobDetails, err := llmService.QueryLLM(prompt)
-	if err != nil {
+	if err == nil {
 		t.Fatalf("Expected LLM query to fail due to no job data, but it succeeded with result: %v", jobDetails)
 	}
 
-	if len(jobDetails) == 0 {
+	if len(jobDetails) != 0 {
 		t.Errorf("Expected empty JSON array, got %v", jobDetails)
 	}
 }
