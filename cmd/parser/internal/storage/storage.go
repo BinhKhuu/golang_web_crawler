@@ -6,7 +6,7 @@ import (
 	"errors"
 	"golangwebcrawler/internal/dbstore"
 	"golangwebcrawler/internal/models"
-	"log"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -14,16 +14,16 @@ import (
 )
 
 type ParserStorageService struct {
-	db *sql.DB
+	db     *sql.DB
+	logger *slog.Logger
 }
 
-// NewDBStorageService Todo return error.
-func NewDBStorageService(db *sql.DB) *ParserStorageService {
-	return &ParserStorageService{db: db}
+func NewDBStorageService(db *sql.DB, logger *slog.Logger) *ParserStorageService {
+	return &ParserStorageService{db: db, logger: logger}
 }
 
-func (s *ParserStorageService) GetLatestRawData(startDate time.Time) ([]models.RawData, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), dbstore.QueryTimeout)
+func (s *ParserStorageService) GetLatestRawData(ctx context.Context, startDate time.Time) ([]models.RawData, error) {
+	ctx, cancel := context.WithTimeout(ctx, dbstore.QueryTimeout)
 	defer cancel()
 
 	rows, err := s.db.QueryContext(ctx,
@@ -38,7 +38,7 @@ func (s *ParserStorageService) GetLatestRawData(startDate time.Time) ([]models.R
 	var results []models.RawData
 	for rows.Next() {
 		var r models.RawData
-		if err := rows.Scan(&r.URL, &r.ContentType, &r.Raw_content); err != nil {
+		if err := rows.Scan(&r.URL, &r.ContentType, &r.RawContent); err != nil {
 			return nil, err
 		}
 		results = append(results, r)
@@ -50,8 +50,8 @@ func (s *ParserStorageService) GetLatestRawData(startDate time.Time) ([]models.R
 	return results, nil
 }
 
-func (s *ParserStorageService) StoreJobListingData(result models.JobListing) error {
-	ctx, cancel := context.WithTimeout(context.Background(), dbstore.QueryTimeout)
+func (s *ParserStorageService) StoreJobListingData(ctx context.Context, result models.JobListing) error {
+	ctx, cancel := context.WithTimeout(ctx, dbstore.QueryTimeout)
 	defer cancel()
 
 	_, err := s.db.ExecContext(
@@ -63,24 +63,23 @@ func (s *ParserStorageService) StoreJobListingData(result models.JobListing) err
 	return err
 }
 
-func (s *ParserStorageService) StoreExtractedJobDataBatchUpSert(results []models.ExtractedJobData) error {
+func (s *ParserStorageService) StoreExtractedJobDataBatchUpSert(ctx context.Context, results []models.ExtractedJobData) error {
 	if len(results) == 0 {
 		return nil
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), dbstore.QueryTimeout)
+	ctx, cancel := context.WithTimeout(ctx, dbstore.QueryTimeout)
 	defer cancel()
 
 	txn, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
-	// Standard defer rollback pattern
+
 	defer func() {
 		rollbackErr := txn.Rollback()
 		if rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) {
-			log.Printf("Failed to rollback transaction: %v", err)
-			return
+			s.logger.Error("Failed to rollback transaction", "error", rollbackErr)
 		}
 	}()
 
@@ -123,12 +122,12 @@ func (s *ParserStorageService) StoreExtractedJobDataBatchUpSert(results []models
 	return txn.Commit()
 }
 
-func (s *ParserStorageService) StoreExtractedJobDataBatch(results []models.ExtractedJobData) error {
+func (s *ParserStorageService) StoreExtractedJobDataBatch(ctx context.Context, results []models.ExtractedJobData) error {
 	if len(results) == 0 {
 		return nil
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), dbstore.QueryTimeout)
+	ctx, cancel := context.WithTimeout(ctx, dbstore.QueryTimeout)
 	defer cancel()
 
 	txn, err := s.db.BeginTx(ctx, nil)
@@ -138,9 +137,7 @@ func (s *ParserStorageService) StoreExtractedJobDataBatch(results []models.Extra
 	defer func() {
 		rollbackErr := txn.Rollback()
 		if rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) {
-			// Log the rollback error if it's not because the transaction is already committed
-			log.Printf("Failed to rollback transaction: %v", err)
-			return
+			s.logger.Error("Failed to rollback transaction", "error", rollbackErr)
 		}
 	}()
 
@@ -161,7 +158,7 @@ func (s *ParserStorageService) StoreExtractedJobDataBatch(results []models.Extra
 
 	defer func() {
 		if err = stmt.Close(); err != nil {
-			log.Printf("Failed to close statement: %v", err)
+			s.logger.Error("Failed to close statement", "error", err)
 			return
 		}
 	}()

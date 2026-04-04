@@ -1,105 +1,135 @@
 package crawler
 
 import (
-	crawlerModels "golangwebcrawler/cmd/crawler/internal/models"
-	"golangwebcrawler/internal/models"
-	"log"
+	"context"
+	"fmt"
+	"golangwebcrawler/cmd/crawler/internal/fetcher"
+	"log/slog"
 	"net/url"
 	"strings"
 	"sync"
 )
 
-type Crawler interface {
-	CrawlAsync(startUrl string, currentDepth int, fetcher Fetcher, parser Parser, storage StorageService) error
-	IsNavigated(url string) bool
-	MarkVisited(url string)
-}
-
-type CrawlerState struct {
-	visited        map[string]bool
-	lock           sync.Mutex
-	wg             sync.WaitGroup
-	maxDepth       int
-	allowedDomains []string
-}
-
-func NewCrawler(maxDepth int, allowedDomains []string) *CrawlerState {
-	return &CrawlerState{
-		visited:        make(map[string]bool),
-		wg:             sync.WaitGroup{},
-		maxDepth:       maxDepth,
-		allowedDomains: allowedDomains,
-	}
-}
-
 type Fetcher interface {
-	Fetch(url string) (crawlerModels.FetchResult, error)
+	Fetch(ctx context.Context, url string) (fetcher.FetchResult, error)
 }
 
 type Parser interface {
-	ParseLinks(body []byte) ([]string, error)
+	ParseLinks(ctx context.Context, body []byte) ([]string, error)
 }
 
 type StorageService interface {
-	StoreRawData(result models.RawData) error
+	StoreRawData(ctx context.Context, url, contentType, rawContent string) error
 }
 
-func (c *CrawlerState) CrawlAsync(startUrl string, depth int, fetcher Fetcher, parser Parser, storage StorageService) error {
-	if !shouldCrawl(depth, startUrl, c) {
+type Crawler struct {
+	maxDepth       int
+	allowedDomains []string
+	visited        map[string]bool
+	mu             sync.Mutex
+	logger         *slog.Logger
+}
+
+type crawlJob struct {
+	url   string
+	depth int
+}
+
+func NewCrawler(maxDepth int, allowedDomains []string, logger *slog.Logger) *Crawler {
+	return &Crawler{
+		maxDepth:       maxDepth,
+		allowedDomains: allowedDomains,
+		visited:        make(map[string]bool),
+		logger:         logger,
+	}
+}
+
+func (c *Crawler) Crawl(ctx context.Context, startURL string, fetcher Fetcher, parser Parser, storage StorageService, concurrency int) error {
+	if concurrency <= 0 {
+		concurrency = 10
+	}
+
+	jobs := make(chan crawlJob, 100)
+	var pending sync.WaitGroup
+
+	if !c.markVisited(startURL) {
 		return nil
 	}
 
-	links, err := processUrl(fetcher, startUrl, parser, storage)
-	if err != nil {
-		return err
+	for range concurrency {
+		go func() {
+			for job := range jobs {
+				if err := c.processURL(ctx, job, fetcher, parser, storage, jobs, &pending); err != nil {
+					c.logger.Warn("error processing URL", "url", job.url, "error", err)
+				}
+				pending.Done()
+			}
+		}()
 	}
 
-	for _, link := range links {
-		c.wg.Add(1)
-		go func(url string) {
-			defer c.wg.Done()
-			newDepth := depth - 1
-			if err := c.CrawlAsync(url, newDepth, fetcher, parser, storage); err != nil {
-				log.Printf("error crawling URL %s: %v", url, err)
-			}
-		}(link)
+	pending.Add(1)
+	jobs <- crawlJob{url: startURL, depth: c.maxDepth}
+
+	pending.Wait()
+	close(jobs)
+
+	return nil
+}
+
+func (c *Crawler) IsNavigated(u string) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.visited[u]
+}
+
+func (c *Crawler) processURL(ctx context.Context, job crawlJob, fetch Fetcher, parse Parser, store StorageService, jobs chan<- crawlJob, pending *sync.WaitGroup) error {
+	if job.depth <= 0 {
+		return nil
+	}
+
+	if !c.isAllowedDomain(job.url) {
+		return nil
+	}
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+
+	fetchResult, err := fetch.Fetch(ctx, job.url)
+	if err != nil {
+		return fmt.Errorf("fetching %s: %w", job.url, err)
+	}
+
+	links, err := parse.ParseLinks(ctx, fetchResult.Body)
+	if err != nil {
+		return fmt.Errorf("parsing links from %s: %w", job.url, err)
+	}
+
+	formattedLinks, err := c.formatLinks(links, job.url)
+	if err != nil {
+		return fmt.Errorf("formatting links from %s: %w", job.url, err)
+	}
+
+	if store != nil {
+		if err := store.StoreRawData(ctx, job.url, "", string(fetchResult.Body)); err != nil {
+			c.logger.Warn("error storing raw data", "url", job.url, "error", err)
+		}
+	}
+
+	for _, link := range formattedLinks {
+		if c.markVisited(link) {
+			pending.Add(1)
+			jobs <- crawlJob{url: link, depth: job.depth - 1}
+		}
 	}
 
 	return nil
 }
 
-func processUrl(fetcher Fetcher, startUrl string, parser Parser, storage StorageService) ([]string, error) {
-	fetchResult, err := fetcher.Fetch(startUrl)
-	if err != nil {
-		return nil, err
-	}
-
-	links, err := parser.ParseLinks(fetchResult.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	formattedLinks, err := formatLinks(links, startUrl)
-	if err != nil {
-		return nil, err
-	}
-
-	if storage != nil {
-		crawlResult := models.RawData{
-			URL:         startUrl,
-			ContentType: "", // This can be set based on fetchResult if needed
-			Raw_content: string(fetchResult.Body),
-			Fetched_at:  "", // This can be set to current timestamp if needed
-		}
-		if err := storage.StoreRawData(crawlResult); err != nil {
-			log.Printf("error storing result for URL %s: %v", startUrl, err)
-		}
-	}
-	return formattedLinks, nil
-}
-
-func formatLinks(links []string, baseUrl string) ([]string, error) {
-	base, err := url.Parse(baseUrl)
+func (c *Crawler) formatLinks(links []string, baseURL string) ([]string, error) {
+	base, err := url.Parse(baseURL)
 	if err != nil {
 		return nil, err
 	}
@@ -115,59 +145,31 @@ func formatLinks(links []string, baseUrl string) ([]string, error) {
 	return links, nil
 }
 
-func shouldCrawl(depth int, startUrl string, c *CrawlerState) bool {
-	if depth == 0 {
+func (c *Crawler) markVisited(u string) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.visited[u] {
 		return false
 	}
-	if !isAllowedDomain(startUrl, c.allowedDomains) {
-		return false
-	}
-	c.lock.Lock()
-	defer c.lock.Unlock()
-	if c.visited == nil {
-		c.visited = make(map[string]bool)
-	}
-	if c.visited[startUrl] {
-		return false
-	}
-	c.visited[startUrl] = true
+	c.visited[u] = true
 	return true
 }
 
-func isAllowedDomain(url string, allowedDomains []string) bool {
-	for _, domain := range allowedDomains {
-		if containsDomain(url, domain) {
+func (c *Crawler) isAllowedDomain(rawURL string) bool {
+	for _, domain := range c.allowedDomains {
+		if c.containsDomain(rawURL, domain) {
 			return true
 		}
 	}
 	return false
 }
 
-func containsDomain(rawURL, domain string) bool {
+func (c *Crawler) containsDomain(rawURL, domain string) bool {
 	parsed, err := url.Parse(rawURL)
 	if err != nil {
 		return false
 	}
 
-	host := parsed.Hostname() // strips port if present
+	host := parsed.Hostname()
 	return host == domain || strings.HasSuffix(host, "."+domain)
-}
-
-func (c *CrawlerState) IsNavigated(url string) bool {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-	return c.visited[url]
-}
-
-func (c *CrawlerState) MarkVisited(url string) {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-	if c.visited == nil {
-		c.visited = make(map[string]bool)
-	}
-	c.visited[url] = true
-}
-
-func (c *CrawlerState) Wait() {
-	c.wg.Wait()
 }

@@ -63,14 +63,14 @@ func Test_StoreRawData_Upserts(t *testing.T) {
 	rawData := models.RawData{
 		URL:         "http://example.com",
 		ContentType: "text/html",
-		Raw_content: "<html><body>Example</body></html>",
+		RawContent:  "<html><body>Example</body></html>",
 	}
 
 	mock.ExpectExec("INSERT INTO raw_data").
-		WithArgs(rawData.URL, rawData.ContentType, rawData.Raw_content).
+		WithArgs(rawData.URL, rawData.ContentType, rawData.RawContent).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 
-	if err := storage.StoreRawData(rawData); err != nil {
+	if err := storage.StoreRawData(context.Background(), rawData); err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 

@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"context"
 	"golangwebcrawler/internal/models"
 	"os"
 	"strings"
@@ -13,7 +14,7 @@ const (
 	testFilePathCard = "./test/testcard.txt"
 )
 
-func (m *mockLLMService) QueryLLM(prompt string) ([]models.ExtractedJobData, error) {
+func (m *mockLLMService) QueryLLM(ctx context.Context, prompt string) ([]models.ExtractedJobData, error) {
 	mockDetails := getMockJobDetails()
 	return []models.ExtractedJobData{mockDetails}, nil
 }
@@ -247,7 +248,7 @@ func getTestLLMData(t *testing.T, filepath string) (string, models.ExtractedJobD
 func Test_ParseJobDataLLM(t *testing.T) {
 	joblistingParser := getJobListingService()
 	testData, expected := getTestLLMData(t, testFilePathCard)
-	jobDetails, err := joblistingParser.ParseJobDataLLM(testData)
+	jobDetails, err := joblistingParser.ParseJobDataLLM(context.Background(), testData)
 	if err != nil {
 		t.Fatalf("Error parsing job data: %v", err)
 	}

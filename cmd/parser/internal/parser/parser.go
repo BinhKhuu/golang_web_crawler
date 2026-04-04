@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -9,8 +10,8 @@ import (
 )
 
 type Parser[T any] interface {
-	ParseLLM(html string) ([]models.ExtractedJobData, error)
-	ParseQuery(html string) ([]models.ExtractedJobData, error)
+	ParseLLM(ctx context.Context, html string) ([]models.ExtractedJobData, error)
+	ParseQuery(ctx context.Context, html string) ([]models.ExtractedJobData, error)
 }
 
 var (

@@ -1,6 +1,7 @@
 package llm
 
 import (
+	"context"
 	"golangwebcrawler/internal/models"
 	"log"
 	"os"
@@ -63,7 +64,7 @@ func Test_ParseJobDataLLM(t *testing.T) {
 		`at the end of the JSON to make it easier to parse in the code
 		Text to process: ` + testData
 
-	jobDetails, err := llmService.QueryLLM(prompt)
+	jobDetails, err := llmService.QueryLLM(context.Background(), prompt)
 	if err != nil {
 		t.Fatalf("LLM query failed: %v", err)
 	}
@@ -107,7 +108,7 @@ func Test_ParseJobDataLLM_ReturnEmptyJsonWhenNoMatch(t *testing.T) {
 		`at the end of the JSON to make it easier to parse in the code
 		Text to process: ` + testData
 
-	jobDetails, err := llmService.QueryLLM(prompt)
+	jobDetails, err := llmService.QueryLLM(context.Background(), prompt)
 	if err == nil {
 		t.Fatalf("Expected LLM query to fail due to no job data, but it succeeded with result: %v", jobDetails)
 	}
@@ -143,7 +144,7 @@ func Test_ParseJobDataLLM_AttemptsToFillInJsonObject(t *testing.T) {
 		`at the end of the JSON to make it easier to parse in the code
 		Text to process: ` + testData
 
-	jobDetails, err := llmService.QueryLLM(prompt)
+	jobDetails, err := llmService.QueryLLM(context.Background(), prompt)
 	if err == nil {
 		t.Fatalf("Expected LLM query to fail due to no job data, but it succeeded with result: %v", jobDetails)
 	}

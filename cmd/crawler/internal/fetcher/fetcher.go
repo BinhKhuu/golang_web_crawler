@@ -1,14 +1,20 @@
 package fetcher
 
 import (
-	"golangwebcrawler/cmd/crawler/internal/models"
+	"context"
+	"fmt"
 	"io"
-	"log"
 	"net/http"
 )
 
+type FetchResult struct {
+	URL        string
+	StatusCode int
+	Body       []byte
+}
+
 type HTTPClient interface {
-	Get(url string) (*http.Response, error)
+	Do(req *http.Request) (*http.Response, error)
 }
 
 type HTTPFetcher struct {
@@ -19,24 +25,29 @@ func NewHTTPFetcher(client HTTPClient) *HTTPFetcher {
 	return &HTTPFetcher{client: client}
 }
 
-func (f *HTTPFetcher) Fetch(url string) (models.FetchResult, error) {
-	resp, err := f.client.Get(url)
+func (f *HTTPFetcher) Fetch(ctx context.Context, url string) (FetchResult, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return models.FetchResult{URL: url, Err: err}, err
+		return FetchResult{}, fmt.Errorf("creating request for %s: %w", url, err)
+	}
+
+	resp, err := f.client.Do(req)
+	if err != nil {
+		return FetchResult{}, fmt.Errorf("fetching %s: %w", url, err)
 	}
 
 	defer func() {
-		if closeErr := resp.Body.Close(); closeErr != nil && err == nil {
-			// log error don't want to override original error if it exists
-			log.Printf("error closing response body for URL %s: %v", url, closeErr)
-		}
+		_ = resp.Body.Close()
 	}()
 
-	body, _ := io.ReadAll(resp.Body)
-	return models.FetchResult{
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return FetchResult{}, fmt.Errorf("reading body for %s: %w", url, err)
+	}
+
+	return FetchResult{
 		URL:        url,
 		StatusCode: resp.StatusCode,
 		Body:       body,
-		Err:        nil,
 	}, nil
 }

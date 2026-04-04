@@ -1,7 +1,7 @@
 package parser
 
 import (
-	"golangwebcrawler/cmd/parser/internal/storage"
+	"context"
 	"golangwebcrawler/internal/models"
 	"html"
 	"strings"
@@ -10,34 +10,31 @@ import (
 )
 
 type LLMService interface {
-	QueryLLM(prompt string) ([]models.ExtractedJobData, error)
+	QueryLLM(ctx context.Context, prompt string) ([]models.ExtractedJobData, error)
 }
 
 type JobListingParser struct {
-	JobListing     models.JobListing
-	RawContent     models.RawData
-	StorageService *storage.ParserStorageService
-	LLMService     LLMService
+	JobListing models.JobListing
+	RawContent models.RawData
+	LLMService LLMService
 }
 
-func (j *JobListingParser) ParseQuery(html string) ([]models.ExtractedJobData, error) {
+func (j *JobListingParser) ParseQuery(ctx context.Context, html string) ([]models.ExtractedJobData, error) {
 	d, err := ParseJobDataQuery(html)
 	return d, err
 }
 
-// todo this interface needs to update, accept the raw data and return the extracted data. use the origin in raw data to set the domains for each link
-func (j *JobListingParser) ParseLLM(html string) ([]models.ExtractedJobData, error) {
-	d, err := j.ParseJobDataLLM(html)
+func (j *JobListingParser) ParseLLM(ctx context.Context, html string) ([]models.ExtractedJobData, error) {
+	d, err := j.ParseJobDataLLM(ctx, html)
 	return d, err
 }
 
-func NewJobListingParser(llmSerivce LLMService) Parser[models.JobListing] {
+func NewJobListingParser(llmService LLMService) Parser[models.JobListing] {
 	return &JobListingParser{
-		LLMService: llmSerivce,
+		LLMService: llmService,
 	}
 }
 
-// ParseJobDataQuery uses goquery to parse job data from HTML content. This is a simple implementation and may need to be enhanced to extract more detailed information.
 func ParseJobDataQuery(html string) ([]models.ExtractedJobData, error) {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
 	if err != nil {
@@ -45,7 +42,6 @@ func ParseJobDataQuery(html string) ([]models.ExtractedJobData, error) {
 	}
 
 	listings := []models.ExtractedJobData{}
-	// This is a very basic parsing logic. Depending on the actual HTML structure, you may need to adjust the selectors and extraction logic to get more accurate data.
 	doc.Find("article[data-testid='job-card']").Each(func(i int, s *goquery.Selection) {
 		titleElement := s.Find("a[data-automation='jobTitle']")
 		title := titleElement.Text()
@@ -62,7 +58,7 @@ func ParseJobDataQuery(html string) ([]models.ExtractedJobData, error) {
 			Salary:      salary,
 			Description: description,
 			Link:        link,
-			Skills:      []string{}, // goquery can't extract these, leave empty or parse from description
+			Skills:      []string{},
 		})
 	})
 	return listings, nil
@@ -89,8 +85,7 @@ func cleanHTMLForLLM(rawHTML string) (string, error) {
 	return strings.Join(cleanedLines, "\n\n"), nil
 }
 
-// ParseJobDataLLM use LLM to parse job data from HTML content. This is a placeholder function and should be implemented with actual LLM logic.
-func (j *JobListingParser) ParseJobDataLLM(html string) ([]models.ExtractedJobData, error) {
+func (j *JobListingParser) ParseJobDataLLM(ctx context.Context, html string) ([]models.ExtractedJobData, error) {
 	_, err := cleanHTMLForLLM(html)
 	if err != nil {
 		return []models.ExtractedJobData{}, err
@@ -110,15 +105,15 @@ func (j *JobListingParser) ParseJobDataLLM(html string) ([]models.ExtractedJobDa
 		`at the end of the JSON to make it easier to parse in the code
 		Text to process: ` + html
 
-	jobData, err := j.LLMService.QueryLLM(prompt)
+	jobData, err := j.LLMService.QueryLLM(ctx, prompt)
 	if err != nil {
 		return []models.ExtractedJobData{}, err
 	}
-	jobData = santiseExtractedData(jobData)
+	jobData = sanitiseExtractedData(jobData)
 	return jobData, nil
 }
 
-func santiseExtractedData(jobData []models.ExtractedJobData) []models.ExtractedJobData {
+func sanitiseExtractedData(jobData []models.ExtractedJobData) []models.ExtractedJobData {
 	for i, data := range jobData {
 		jobData[i].Link = html.UnescapeString(data.Link)
 	}

@@ -1,8 +1,10 @@
 package storage
 
 import (
+	"context"
 	"golangwebcrawler/internal/models"
 	"golangwebcrawler/internal/typeutil"
+	"log/slog"
 	"strings"
 	"testing"
 	"time"
@@ -19,7 +21,7 @@ func Test_GetLatestRawData_ReturnsRawData(t *testing.T) {
 
 	defer db.Close()
 
-	storageService := NewDBStorageService(db)
+	storageService := NewDBStorageService(db, slog.Default())
 	timeParam := time.Now().Add(-time.Hour)
 
 	rows := sqlmock.NewRows([]string{"url", "content_type", "raw_content"}).
@@ -29,7 +31,7 @@ func Test_GetLatestRawData_ReturnsRawData(t *testing.T) {
 		WithArgs(timeParam).
 		WillReturnRows(rows)
 
-	result, err := storageService.GetLatestRawData(timeParam)
+	result, err := storageService.GetLatestRawData(context.Background(), timeParam)
 	if err != nil {
 		t.Fatalf("unexpected error: %s", err)
 	}
@@ -49,7 +51,7 @@ func Test_StoreExtractedJobDataBatch(t *testing.T) {
 	}
 	defer db.Close()
 
-	storageService := NewDBStorageService(db)
+	storageService := NewDBStorageService(db, slog.Default())
 	jobCards := mockJobCards()
 	mock.ExpectBegin()
 
@@ -63,7 +65,7 @@ func Test_StoreExtractedJobDataBatch(t *testing.T) {
 	}
 	mock.ExpectCommit()
 
-	if err := storageService.StoreExtractedJobDataBatch(jobCards); err != nil {
+	if err := storageService.StoreExtractedJobDataBatch(context.Background(), jobCards); err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 }
@@ -97,7 +99,7 @@ func Test_StoreExtractedJobDataBatchUpSert(t *testing.T) {
 	}
 	defer db.Close()
 
-	storageService := NewDBStorageService(db)
+	storageService := NewDBStorageService(db, slog.Default())
 	jobCards := mockJobCards()
 
 	mock.ExpectBegin()
@@ -109,7 +111,7 @@ func Test_StoreExtractedJobDataBatchUpSert(t *testing.T) {
 			WillReturnResult(sqlmock.NewResult(1, 1))
 	}
 	mock.ExpectCommit()
-	if err := storageService.StoreExtractedJobDataBatchUpSert(jobCards); err != nil {
+	if err := storageService.StoreExtractedJobDataBatchUpSert(context.Background(), jobCards); err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 }
@@ -121,14 +123,14 @@ func Test_StoreJobListingData(t *testing.T) {
 	}
 	defer db.Close()
 
-	storageService := NewDBStorageService(db)
+	storageService := NewDBStorageService(db, slog.Default())
 	jobListing := getMockJobListing()
 
 	mock.ExpectExec("INSERT INTO job_listings").
 		WithArgs(jobListing.Title, jobListing.Company, jobListing.Location, jobListing.RemoteFlag, jobListing.SalaryMin, jobListing.SalaryMax, jobListing.Currency, jobListing.DescriptionHTML, jobListing.DescriptionText, jobListing.PostedDate, jobListing.ExpiresAt, jobListing.Source, jobListing.SourceID, jobListing.URL, sqlmock.AnyArg(), jobListing.RawJSON).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 
-	if err := storageService.StoreJobListingData(jobListing); err != nil {
+	if err := storageService.StoreJobListingData(context.Background(), jobListing); err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 

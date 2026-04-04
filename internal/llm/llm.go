@@ -46,19 +46,19 @@ func initLLMConnection() (*api.Client, error) {
 	return client, nil
 }
 
-func (l *LLMService) QueryLLM(prompt string) ([]models.ExtractedJobData, error) {
+func (l *LLMService) QueryLLM(ctx context.Context, prompt string) ([]models.ExtractedJobData, error) {
 	req := &api.GenerateRequest{
 		Model:  l.ModelName,
 		Prompt: prompt,
 		Options: map[string]any{
-			"num_ctx": MaxMemoryMBs, // This is temporary for THIS specific call only
+			"num_ctx": MaxMemoryMBs,
 		},
-		Stream: new(bool), // Set to false for a single complete response
+		Stream: new(bool),
 	}
 
 	var fullResponse strings.Builder
 
-	err := l.Client.Generate(context.Background(), req, func(resp api.GenerateResponse) error {
+	err := l.Client.Generate(ctx, req, func(resp api.GenerateResponse) error {
 		fullResponse.WriteString(resp.Response)
 		return nil
 	})
@@ -66,7 +66,6 @@ func (l *LLMService) QueryLLM(prompt string) ([]models.ExtractedJobData, error) 
 		return nil, err
 	}
 
-	// 1. Extract the JSON block using Regex
 	re := regexp.MustCompile("(?s)```json\n?(.*?)\n?```")
 	message := fullResponse.String()
 	match := re.FindStringSubmatch(message)
@@ -91,7 +90,7 @@ func (l *LLMService) QueryLLM(prompt string) ([]models.ExtractedJobData, error) 
 		}
 
 		return job, nil
-	} else {
-		return nil, ErrNoJson
 	}
+
+	return nil, ErrNoJson
 }

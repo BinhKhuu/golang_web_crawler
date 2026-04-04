@@ -16,17 +16,9 @@ import (
 	"golangwebcrawler/cmd/crawler/internal/crawler"
 	"golangwebcrawler/cmd/crawler/internal/fetcher"
 	"golangwebcrawler/cmd/crawler/internal/parser"
-	"golangwebcrawler/cmd/crawler/internal/storage"
 )
 
-// Storage.
-var _ crawler.StorageService = (*storage.CrawlerStorageService)(nil)
-
-// Fetcher.
-var _ crawler.Fetcher = (*fetcher.HTTPFetcher)(nil)
-
-// Parser.
-var _ crawler.Parser = (*parser.HTTPParser)(nil)
-
-// Crawler.
-var _ crawler.Crawler = (*crawler.CrawlerState)(nil)
+var (
+	_ crawler.Fetcher = (*fetcher.HTTPFetcher)(nil)
+	_ crawler.Parser  = (*parser.HTTPParser)(nil)
+)

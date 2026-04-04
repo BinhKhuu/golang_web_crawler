@@ -1,46 +1,76 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"golangwebcrawler/cmd/crawler/internal/crawler"
 	"golangwebcrawler/cmd/crawler/internal/fetcher"
 	"golangwebcrawler/cmd/crawler/internal/parser"
-	"golangwebcrawler/cmd/crawler/internal/storage"
 	"golangwebcrawler/internal/dbstore"
-	"log"
+	"golangwebcrawler/internal/storage"
+	"log/slog"
 	"net/http"
 	"os"
+	"os/signal"
+	"strings"
+	"syscall"
+	"time"
 
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 )
 
+const (
+	httpTimeout             = 30 * time.Second
+	httpMaxIdleConns        = 100
+	httpMaxIdleConnsPerHost = 10
+	httpIdleConnTimeout     = 90 * time.Second
+	defaultConcurrency      = 10
+	defaultMaxDepth         = 3
+)
+
 func main() {
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
+
 	cfg, err := Load("../../.env")
 	if err != nil {
-		log.Printf("Error loading .env file: %v\n", err)
+		logger.Error("Error loading .env file", "error", err)
 		return
 	}
 
 	database, err := dbstore.SetupDatabase()
 	if err != nil {
-		log.Printf("error setting up database: %v\n", err)
+		logger.Error("error setting up database", "error", err)
 		return
 	}
-	defer database.Close()
+	defer func() {
+		if dbCloseErr := database.Close(); err != nil {
+			logger.Error("error closing database connection", "error", dbCloseErr)
+		}
+	}()
 
-	httpClient := http.DefaultClient
-	crawler := crawler.NewCrawler(cfg.MaxDepth, cfg.AllowedDomains)
-	storage := storage.NewDBStorageService(database)
-	parser := parser.NewHTTPParser()
-	fetcher := fetcher.NewHTTPFetcher(httpClient)
-
-	err = crawler.CrawlAsync("https://www.seek.com.au/software-engineer-jobs", 1, fetcher, parser, storage)
-	if err != nil {
-		log.Printf("error starting crawl: %v\n", err)
+	httpClient := &http.Client{
+		Timeout: httpTimeout,
+		Transport: &http.Transport{
+			MaxIdleConns:        httpMaxIdleConns,
+			MaxIdleConnsPerHost: httpMaxIdleConnsPerHost,
+			IdleConnTimeout:     httpIdleConnTimeout,
+		},
 	}
-	crawler.Wait()
-	log.Printf("Crawling completed.")
+
+	c := crawler.NewCrawler(cfg.MaxDepth, cfg.AllowedDomains, logger)
+	storageSvc := storage.NewService(database, logger)
+	p := parser.NewHTTPParser()
+	f := fetcher.NewHTTPFetcher(httpClient)
+
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+
+	err = c.Crawl(ctx, "https://www.seek.com.au/software-engineer-jobs", f, p, storageSvc, defaultConcurrency)
+	if err != nil {
+		logger.Error("error during crawl", "error", err)
+	}
+	logger.Info("Crawling completed.")
 }
 
 type CrawlerConfig struct {
@@ -55,11 +85,28 @@ func Load(envFile string) (*CrawlerConfig, error) {
 		return nil, fmt.Errorf("failed to load env file: %w", err)
 	}
 
-	const maxDepth = 3
+	maxDepth := defaultMaxDepth
+	if val := os.Getenv("CRAWLER_MAX_DEPTH"); val != "" {
+		if _, err := fmt.Sscanf(val, "%d", &maxDepth); err != nil {
+			logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+			logger.Warn("invalid CRAWLER_MAX_DEPTH value, using default", "value", val, "default", maxDepth)
+		}
+	}
+
+	allowedDomains := []string{"seek.com.au"}
+	if val := os.Getenv("CRAWLER_ALLOWED_DOMAINS"); val != "" {
+		allowedDomains = nil
+		for d := range strings.SplitSeq(val, ",") {
+			if d = strings.TrimSpace(d); d != "" {
+				allowedDomains = append(allowedDomains, d)
+			}
+		}
+	}
+
 	return &CrawlerConfig{
 		DBHost:         os.Getenv("DB_HOST"),
 		DBPort:         os.Getenv("DB_PORT"),
 		MaxDepth:       maxDepth,
-		AllowedDomains: []string{"seek.com.au"},
+		AllowedDomains: allowedDomains,
 	}, nil
 }

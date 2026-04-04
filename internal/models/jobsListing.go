@@ -2,7 +2,7 @@ package models
 
 import "time"
 
-// Currently not used, but can be used for storing raw job listing data before parsing and extracting structured information.
+// JobListing stores raw job listing data before parsing and extracting structured information.
 type JobListing struct {
 	ID              int64
 	Title           string
