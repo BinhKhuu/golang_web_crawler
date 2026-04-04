@@ -25,6 +25,7 @@ func (j *JobListingParser) ParseQuery(html string) ([]models.ExtractedJobData, e
 	return d, err
 }
 
+// todo this interface needs to update, accept the raw data and return the extracted data. use the origin in raw data to set the domains for each link
 func (j *JobListingParser) ParseLLM(html string) ([]models.ExtractedJobData, error) {
 	d, err := j.ParseJobDataLLM(html)
 	return d, err

@@ -1,44 +1,43 @@
 todo: 
-    1. Parse data link needs to have the original domain if its not there
-    1. Store Parse data
-        unit test bulk storage
-        jobparser does not need a storage service because its not storing that data just returning parse data
-    1. figure out what the model for extract_jobdata should look like and how to map it to joblisting if needed 
-        what is joblisting model used for? should joblisting be the thing thats stored and extract_data be the thing that transform into joblisting
-    1. make sure pipelines don't run LLM for testing
-    1. Build the LLM parser with one of the defined strategies 
-        - LLM testing can't test the output of llm through unit tests have to do structure so that llm service can be mocked
-    2. Update crawler to get more speicified data or design a data splitter / organiser to validate the data before feeding it to the LLM for job Parsing
 
-        Use Ollama in docker and parse html with the api.
-            - load ollama in docker
-            - retrieve data from database 
-            - call ollama to parse the data and return json format 
+    1. Parser Design 
+        1. Parser needs to expect a model raw which has the domain website, use this to map the origin to the links for each job
+        1. figure out what the model for extract_jobdata should look like and how to map it to joblisting if needed 
+            what is joblisting model used for? should joblisting be the thing thats stored and extract_data be the thing that transform into joblisting
+        1. make sure pipelines don't run LLM for testing
 
-            - Raw HTML is large - crawler needs to go to individual pages and store that information via the browserfetcher 
-                - each post is small enough to pass to the LLM to extract data 
+    2. Cralwer Design
+        2. Update crawler to get more speicified data or design a data splitter / organiser to validate the data before feeding it to the LLM for job Parsing
 
-        LLM Parser 
-            - Expected data limit of 16GB (Hardware limitation) 
-            - Sanitise the input ( trim white space, remove unwanted html elements like script etc)
-            - Parser needs to work with the hardware limitations
-                Strategy:
-                    1. Parse the HTML via goquery to find each jobs root element then use the LLM to extract the job data
-                    2. Cralwer goes to each job page rather than supply the main board 
-                        1. navigate all the links with in the domain by finding the job links (go query or llm strategy)
+            Use Ollama in docker and parse html with the api.
+                - load ollama in docker
+                - retrieve data from database 
+                - call ollama to parse the data and return json format 
 
-        Crawler
-            - Using BrowserFetcher search for target 'job' then navigate to each link and save that data 
-            - rate limit and anti bot detection
+                - Raw HTML is large - crawler needs to go to individual pages and store that information via the browserfetcher 
+                    - each post is small enough to pass to the LLM to extract data 
+
+            LLM Parser 
+                - Expected data limit of 16GB (Hardware limitation) 
+                - Sanitise the input ( trim white space, remove unwanted html elements like script etc)
+                - Parser needs to work with the hardware limitations
+                    Strategy:
+                        1. Parse the HTML via goquery to find each jobs root element then use the LLM to extract the job data
+                        2. Cralwer goes to each job page rather than supply the main board 
+                            1. navigate all the links with in the domain by finding the job links (go query or llm strategy)
+
+            Crawler
+                - Using BrowserFetcher search for target 'job' then navigate to each link and save that data 
+                - rate limit and anti bot detection
 
 
-            1. Fetcher issue, The current HTTPFetcher uses a simple HTTP GET request which only retrieves the initial HTML. For Single Page Applications (SPAs), JavaScript needs to execute to render the full content. We need to use a headless browser approach.
-                Solution
-                Create a new BrowserFetcher that uses the chromedp package to launch a headless Chrome browser, wait for the page to fully load (including JS execution), then read the rendered HTML body.
-                Keep the existing HTTPFetcher for non-SPA pages.
-                https://github.com/chromedp/chromedp
+                1. Fetcher issue, The current HTTPFetcher uses a simple HTTP GET request which only retrieves the initial HTML. For Single Page Applications (SPAs), JavaScript needs to execute to render the full content. We need to use a headless browser approach.
+                    Solution
+                    Create a new BrowserFetcher that uses the chromedp package to launch a headless Chrome browser, wait for the page to fully load (including JS execution), then read the rendered HTML body.
+                    Keep the existing HTTPFetcher for non-SPA pages.
+                    https://github.com/chromedp/chromedp
 
-                1. mimic searching the site as a user programatically
+                    1. mimic searching the site as a user programatically
     
     3. Testing
         - LLM testing can't test the output of llm through unit tests have to do structure so that llm service can be mocked
