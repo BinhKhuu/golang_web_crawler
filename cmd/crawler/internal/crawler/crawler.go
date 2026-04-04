@@ -35,6 +35,8 @@ type crawlJob struct {
 	depth int
 }
 
+const channelBufferLimit = 100
+
 func NewCrawler(maxDepth int, allowedDomains []string, logger *slog.Logger) *Crawler {
 	return &Crawler{
 		maxDepth:       maxDepth,
@@ -49,7 +51,7 @@ func (c *Crawler) Crawl(ctx context.Context, startURL string, fetcher Fetcher, p
 		concurrency = 10
 	}
 
-	jobs := make(chan crawlJob, 100)
+	jobs := make(chan crawlJob, channelBufferLimit)
 	var pending sync.WaitGroup
 
 	if !c.markVisited(startURL) {
