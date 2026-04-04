@@ -38,6 +38,12 @@ todo:
                     https://github.com/chromedp/chromedp
 
                     1. mimic searching the site as a user programatically
+
+    2. Crawler concurrency deadlock 
+        One thing to be aware of: dropping links means some pages won't be crawled when under heavy load. 
+        If completeness matters, 
+        an alternative would be to use a separate dispatcher goroutine that buffers jobs in an unbounded in-memory queue, 
+        but for most crawlers the drop approach is acceptable.
     
     3. Testing
         - LLM testing can't test the output of llm through unit tests have to do structure so that llm service can be mocked

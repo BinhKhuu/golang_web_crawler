@@ -25,7 +25,7 @@ const (
 	httpMaxIdleConns        = 100
 	httpMaxIdleConnsPerHost = 10
 	httpIdleConnTimeout     = 90 * time.Second
-	defaultConcurrency      = 10
+	defaultConcurrency      = 100
 	defaultMaxDepth         = 3
 )
 
@@ -66,7 +66,7 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	err = c.Crawl(ctx, "https://www.seek.com.au/software-engineer-jobs", f, p, storageSvc, defaultConcurrency)
+	err = c.Crawl(ctx, "https://example.com", f, p, storageSvc, defaultConcurrency)
 	if err != nil {
 		logger.Error("error during crawl", "error", err)
 	}
@@ -93,7 +93,7 @@ func Load(envFile string) (*CrawlerConfig, error) {
 		}
 	}
 
-	allowedDomains := []string{"seek.com.au"}
+	allowedDomains := []string{"seek.com.au", "example.com", "iana.org"}
 	if val := os.Getenv("CRAWLER_ALLOWED_DOMAINS"); val != "" {
 		allowedDomains = nil
 		for d := range strings.SplitSeq(val, ",") {

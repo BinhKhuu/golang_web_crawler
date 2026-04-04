@@ -82,6 +82,7 @@ func (c *Crawler) IsNavigated(u string) bool {
 	return c.visited[u]
 }
 
+// processURL will drop crawls when channel is blocked to prevent deadlocks and keep workers moving. This means some links may be skipped if the queue is full, but it ensures the crawler continues to operate smoothly under load.
 func (c *Crawler) processURL(ctx context.Context, job crawlJob, fetch Fetcher, parse Parser, store StorageService, jobs chan<- crawlJob, pending *sync.WaitGroup) error {
 	if job.depth <= 0 {
 		return nil
@@ -121,7 +122,14 @@ func (c *Crawler) processURL(ctx context.Context, job crawlJob, fetch Fetcher, p
 	for _, link := range formattedLinks {
 		if c.markVisited(link) {
 			pending.Add(1)
-			jobs <- crawlJob{url: link, depth: job.depth - 1}
+			select {
+			case jobs <- crawlJob{url: link, depth: job.depth - 1}:
+				// channel accepted the job, continue
+			default:
+				// Channel is FULL. Drop the link and move on to unblock the worker.
+				c.logger.Warn("Queue full, dropping link", "url", link)
+				pending.Done()
+			}
 		}
 	}
 
