@@ -1,4 +1,5 @@
 todo: 
+    1. Parse data link needs to have the original domain if its not there
     1. Store Parse data
         unit test bulk storage
         jobparser does not need a storage service because its not storing that data just returning parse data

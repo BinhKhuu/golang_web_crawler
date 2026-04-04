@@ -50,6 +50,25 @@ func Test_StoreExtractedJobDataBatch(t *testing.T) {
 	defer db.Close()
 
 	storageService := NewDBStorageService(db)
+	jobCards := mockJobCards()
+	mock.ExpectBegin()
+
+	mock.ExpectPrepare(`COPY "extracted_jobdata" \("title", "company", "location", "salary", "description", "link", "skills"\) FROM STDIN`)
+
+	for _, jobCard := range jobCards {
+		expectedSkills := strings.Join(jobCard.Skills, ",")
+		mock.ExpectExec(`COPY "extracted_jobdata"`).
+			WithArgs(jobCard.Title, jobCard.Company, jobCard.Location, jobCard.Salary, jobCard.Description, jobCard.Link, expectedSkills).
+			WillReturnResult(sqlmock.NewResult(0, 1))
+	}
+	mock.ExpectCommit()
+
+	if err := storageService.StoreExtractedJobDataBatch(jobCards); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+}
+
+func mockJobCards() []models.ExtractedJobData {
 	jobCards := []models.ExtractedJobData{
 		{
 			Title:    "Software Engineer",
@@ -68,19 +87,29 @@ func Test_StoreExtractedJobDataBatch(t *testing.T) {
 			Skills:   []string{"Python", "AWS"},
 		},
 	}
+	return jobCards
+}
+
+func Test_StoreExtractedJobDataBatchUpSert(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+	defer db.Close()
+
+	storageService := NewDBStorageService(db)
+	jobCards := mockJobCards()
+
 	mock.ExpectBegin()
-
-	mock.ExpectPrepare(`COPY "extracted_jobdata" \("title", "company", "location", "salary", "description", "link", "skills"\) FROM STDIN`)
-
+	mock.ExpectPrepare(`INSERT INTO extracted_jobdata \(title, company, location, salary, description, link, skills\) VALUES \(\$1, \$2, \$3, \$4, \$5, \$6, \$7\) ON CONFLICT \(link\) DO UPDATE SET title = EXCLUDED.title, company = EXCLUDED.company, location = EXCLUDED.location, salary = EXCLUDED.salary, description = EXCLUDED.description, skills = EXCLUDED.skills`)
 	for _, jobCard := range jobCards {
 		expectedSkills := strings.Join(jobCard.Skills, ",")
-		mock.ExpectExec(`COPY "extracted_jobdata"`).
+		mock.ExpectExec(`INSERT INTO extracted_jobdata`).
 			WithArgs(jobCard.Title, jobCard.Company, jobCard.Location, jobCard.Salary, jobCard.Description, jobCard.Link, expectedSkills).
-			WillReturnResult(sqlmock.NewResult(0, 1))
+			WillReturnResult(sqlmock.NewResult(1, 1))
 	}
 	mock.ExpectCommit()
-
-	if err := storageService.StoreExtractedJobDataBatch(jobCards); err != nil {
+	if err := storageService.StoreExtractedJobDataBatchUpSert(jobCards); err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 }
@@ -93,6 +122,22 @@ func Test_StoreJobListingData(t *testing.T) {
 	defer db.Close()
 
 	storageService := NewDBStorageService(db)
+	jobListing := getMockJobListing()
+
+	mock.ExpectExec("INSERT INTO job_listings").
+		WithArgs(jobListing.Title, jobListing.Company, jobListing.Location, jobListing.RemoteFlag, jobListing.SalaryMin, jobListing.SalaryMax, jobListing.Currency, jobListing.DescriptionHTML, jobListing.DescriptionText, jobListing.PostedDate, jobListing.ExpiresAt, jobListing.Source, jobListing.SourceID, jobListing.URL, sqlmock.AnyArg(), jobListing.RawJSON).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+
+	if err := storageService.StoreJobListingData(jobListing); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %s", err)
+	}
+}
+
+func getMockJobListing() models.JobListing {
 	jobListing := models.JobListing{
 		Company:         "Example Inc",
 		RemoteFlag:      true,
@@ -110,16 +155,5 @@ func Test_StoreJobListingData(t *testing.T) {
 		Tags:            []string{"Go", "Remote"},
 		RawJSON:         []byte(`{"title": "Software Engineer"}`),
 	}
-
-	mock.ExpectExec("INSERT INTO job_listings").
-		WithArgs(jobListing.Title, jobListing.Company, jobListing.Location, jobListing.RemoteFlag, jobListing.SalaryMin, jobListing.SalaryMax, jobListing.Currency, jobListing.DescriptionHTML, jobListing.DescriptionText, jobListing.PostedDate, jobListing.ExpiresAt, jobListing.Source, jobListing.SourceID, jobListing.URL, sqlmock.AnyArg(), jobListing.RawJSON).
-		WillReturnResult(sqlmock.NewResult(1, 1))
-
-	if err := storageService.StoreJobListingData(jobListing); err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("there were unfulfilled expectations: %s", err)
-	}
+	return jobListing
 }

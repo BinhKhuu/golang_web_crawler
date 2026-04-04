@@ -3,6 +3,7 @@ package parser
 import (
 	"golangwebcrawler/cmd/parser/internal/storage"
 	"golangwebcrawler/internal/models"
+	"html"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
@@ -112,5 +113,13 @@ func (j *JobListingParser) ParseJobDataLLM(html string) ([]models.ExtractedJobDa
 	if err != nil {
 		return []models.ExtractedJobData{}, err
 	}
+	jobData = santiseExtractedData(jobData)
 	return jobData, nil
+}
+
+func santiseExtractedData(jobData []models.ExtractedJobData) []models.ExtractedJobData {
+	for i, data := range jobData {
+		jobData[i].Link = html.UnescapeString(data.Link)
+	}
+	return jobData
 }

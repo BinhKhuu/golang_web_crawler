@@ -63,6 +63,66 @@ func (s *ParserStorageService) StoreJobListingData(result models.JobListing) err
 	return err
 }
 
+func (s *ParserStorageService) StoreExtractedJobDataBatchUpSert(results []models.ExtractedJobData) error {
+	if len(results) == 0 {
+		return nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), dbstore.QueryTimeout)
+	defer cancel()
+
+	txn, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	// Standard defer rollback pattern
+	defer func() {
+		rollbackErr := txn.Rollback()
+		if rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) {
+			log.Printf("Failed to rollback transaction: %v", err)
+			return
+		}
+	}()
+
+	query := `
+		INSERT INTO extracted_jobdata (title, company, location, salary, description, link, skills)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		ON CONFLICT (link) 
+		DO UPDATE SET 
+			title = EXCLUDED.title,
+			company = EXCLUDED.company,
+			location = EXCLUDED.location,
+			salary = EXCLUDED.salary,
+			description = EXCLUDED.description,
+			skills = EXCLUDED.skills,
+			updated_at = NOW();
+	`
+
+	stmt, err := txn.PrepareContext(ctx, query)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	for _, result := range results {
+		skills := strings.Join(result.Skills, ",")
+		_, err = stmt.ExecContext(ctx,
+			result.Title,
+			result.Company,
+			result.Location,
+			result.Salary,
+			result.Description,
+			result.Link,
+			skills,
+		)
+		if err != nil {
+			return err
+		}
+	}
+
+	return txn.Commit()
+}
+
 func (s *ParserStorageService) StoreExtractedJobDataBatch(results []models.ExtractedJobData) error {
 	if len(results) == 0 {
 		return nil

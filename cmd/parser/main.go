@@ -57,7 +57,7 @@ func ParseJobListing(html string, db *sql.DB) (models.JobListing, error) {
 
 	// don't need to check if results are empty the parser should return an error if no results could be parsed.
 
-	err = storageService.StoreExtractedJobDataBatch(j)
+	err = storageService.StoreExtractedJobDataBatchUpSert(j)
 	if err != nil {
 		log.Printf("Failed to store extracted job data: %v", err)
 		return models.JobListing{}, err

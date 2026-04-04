@@ -19,9 +19,13 @@ CREATE TABLE extracted_jobdata(
     
     -- Track when the row was created
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Index for faster searching by company or title
 CREATE INDEX idx_extracted_jobdata_company ON extracted_jobdata(company);
 CREATE INDEX idx_extracted_jobdata_title ON extracted_jobdata(title);
 CREATE INDEX idx_extracted_jobdata_link ON extracted_jobdata(link);
+
+ALTER TABLE extracted_jobdata 
+ADD CONSTRAINT unique_job_link UNIQUE (link);
