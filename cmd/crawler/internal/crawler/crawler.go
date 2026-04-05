@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+	"time"
 )
 
 type Fetcher interface {
@@ -35,7 +36,10 @@ type crawlJob struct {
 	depth int
 }
 
-const channelBufferLimit = 100
+type discoveredLinks struct {
+	links []string
+	depth int
+}
 
 func NewCrawler(maxDepth int, allowedDomains []string, logger *slog.Logger) *Crawler {
 	return &Crawler{
@@ -46,34 +50,59 @@ func NewCrawler(maxDepth int, allowedDomains []string, logger *slog.Logger) *Cra
 	}
 }
 
+/*
+Crawl performs concurrent web crawling with the following architecture:
+
+Coordinator manages crawl state, coordinates workers, and prevents deadlocks:
+  - Tracks pending jobs and queued discoveries
+  - Enforces graceful shutdown with a 5-second grace period
+  - Terminates when no work remains or timeout expires
+
+Channels:
+  - jobs: URLs ready to be crawled by worker goroutines
+  - discovered: Newly found URLs waiting to be queued (backpressure buffer)
+  - done: Signals crawl completion to prevent early return
+
+Termination conditions:
+ 1. Context is cancelled (external cancellation)
+ 2. No pending jobs AND discovery queue empty for 5 seconds (natural completion)
+
+Workers process URLs concurrently (limited by concurrency parameter) and send
+discovered links back to the coordinator for scheduling.
+*/
 func (c *Crawler) Crawl(ctx context.Context, startURL string, fetcher Fetcher, parser Parser, storage StorageService, concurrency int) error {
 	if concurrency <= 0 {
 		concurrency = 10
 	}
 
-	jobs := make(chan crawlJob, channelBufferLimit)
-	var pending sync.WaitGroup
+	jobs := make(chan crawlJob)
+	discovered := make(chan discoveredLinks, concurrency)
+	var workerWG sync.WaitGroup
+	done := make(chan struct{})
 
 	if !c.markVisited(startURL) {
 		return nil
 	}
 
+	go func() {
+		c.coordinator(ctx, jobs, discovered, &workerWG, done)
+	}()
+
 	for range concurrency {
-		go func() {
+		workerWG.Go(func() {
 			for job := range jobs {
-				if err := c.processURL(ctx, job, fetcher, parser, storage, jobs, &pending); err != nil {
+				links, err := c.processURL(ctx, job, fetcher, parser, storage)
+				if err != nil {
 					c.logger.Warn("error processing URL", "url", job.url, "error", err)
 				}
-				pending.Done()
+				discovered <- discoveredLinks{links: links, depth: job.depth}
 			}
-		}()
+		})
 	}
 
-	pending.Add(1)
 	jobs <- crawlJob{url: startURL, depth: c.maxDepth}
 
-	pending.Wait()
-	close(jobs)
+	<-done
 
 	return nil
 }
@@ -84,35 +113,84 @@ func (c *Crawler) IsNavigated(u string) bool {
 	return c.visited[u]
 }
 
-// processURL will drop crawls when channel is blocked to prevent deadlocks and keep workers moving. This means some links may be skipped if the queue is full, but it ensures the crawler continues to operate smoothly under load.
-func (c *Crawler) processURL(ctx context.Context, job crawlJob, fetch Fetcher, parse Parser, store StorageService, jobs chan<- crawlJob, pending *sync.WaitGroup) error {
+func (c *Crawler) coordinator(ctx context.Context, jobs chan<- crawlJob, discovered <-chan discoveredLinks, workerWG *sync.WaitGroup, done chan<- struct{}) {
+	pending := 1
+	var queue []crawlJob
+	const resetSeconds = 5
+	idleTimer := time.NewTimer(resetSeconds * time.Second)
+	if !idleTimer.Stop() {
+		<-idleTimer.C
+	}
+	for {
+		var sendCh chan<- crawlJob
+		var jobToSend crawlJob
+
+		if len(queue) > 0 {
+			sendCh = jobs
+			jobToSend = queue[0]
+			idleTimer.Stop()
+		}
+
+		select {
+		case <-ctx.Done(): // interrupt signal release all resources and return
+			close(jobs)
+			workerWG.Wait()
+			close(done)
+			return
+		case sendCh <- jobToSend: // is sendCh ready for a job
+			queue = queue[1:] // reshuffle the queue after sending a job
+		case batch := <-discovered: // discovered links from a worker add to queue
+			pending--
+			for _, link := range batch.links {
+				if c.markVisited(link) {
+					pending++
+					queue = append(queue, crawlJob{url: link, depth: batch.depth - 1})
+				}
+			}
+			if pending == 0 && len(queue) == 0 {
+				// wait 5 seconds for queue to be refilled before closing channels to help slow tasks return
+				idleTimer.Reset(resetSeconds * time.Second)
+			}
+		case <-idleTimer.C:
+			// If this fires, we have truly been idle for 5 seconds
+			if pending == 0 && len(queue) == 0 {
+				close(jobs)
+				workerWG.Wait()
+				close(done)
+				return
+			}
+		}
+	}
+}
+
+func (c *Crawler) processURL(ctx context.Context, job crawlJob, fetch Fetcher, parse Parser, store StorageService) ([]string, error) {
 	if job.depth <= 0 {
-		return nil
+		return nil, nil
 	}
 
 	if !c.isAllowedDomain(job.url) {
-		return nil
+		return nil, nil
 	}
 
 	select {
 	case <-ctx.Done():
-		return ctx.Err()
+		return nil, ctx.Err()
 	default:
 	}
 
 	fetchResult, err := fetch.Fetch(ctx, job.url)
 	if err != nil {
-		return fmt.Errorf("fetching %s: %w", job.url, err)
+		return nil, fmt.Errorf("fetching %s: %w", job.url, err)
 	}
 
 	links, err := parse.ParseLinks(ctx, fetchResult.Body)
 	if err != nil {
-		return fmt.Errorf("parsing links from %s: %w", job.url, err)
+		return nil, fmt.Errorf("parsing links from %s: %w", job.url, err)
 	}
 
 	formattedLinks, err := c.formatLinks(links, job.url)
 	if err != nil {
-		return fmt.Errorf("formatting links from %s: %w", job.url, err)
+		return nil, fmt.Errorf("formatting links from %s: %w", job.url, err)
 	}
 
 	if store != nil {
@@ -121,21 +199,7 @@ func (c *Crawler) processURL(ctx context.Context, job crawlJob, fetch Fetcher, p
 		}
 	}
 
-	for _, link := range formattedLinks {
-		if c.markVisited(link) {
-			pending.Add(1)
-			select {
-			case jobs <- crawlJob{url: link, depth: job.depth - 1}:
-				// channel accepted the job, continue
-			default:
-				// Channel is FULL. Drop the link and move on to unblock the worker.
-				c.logger.Warn("Queue full, dropping link", "url", link)
-				pending.Done()
-			}
-		}
-	}
-
-	return nil
+	return formattedLinks, nil
 }
 
 func (c *Crawler) formatLinks(links []string, baseURL string) ([]string, error) {
