@@ -15,8 +15,8 @@ func NewDBStorageService(db *sql.DB) *CrawlerStorageService {
 	return &CrawlerStorageService{db: db}
 }
 
-func (s *CrawlerStorageService) StoreRawData(result models.RawData) error {
-	ctx, cancel := context.WithTimeout(context.Background(), dbstore.QueryTimeout)
+func (s *CrawlerStorageService) StoreRawData(ctx context.Context, result models.RawData) error {
+	ctx, cancel := context.WithTimeout(ctx, dbstore.QueryTimeout)
 	defer cancel()
 	_, err := s.db.ExecContext(
 		ctx,
@@ -24,7 +24,7 @@ func (s *CrawlerStorageService) StoreRawData(result models.RawData) error {
 		VALUES ($1, $2, $3)
 		ON CONFLICT (url) 
 		DO UPDATE SET content_type = $2, raw_content = $3, fetched_at = NOW()`,
-		result.URL, result.ContentType, result.Raw_content,
+		result.URL, result.ContentType, result.RawContent,
 	)
 	return err
 }

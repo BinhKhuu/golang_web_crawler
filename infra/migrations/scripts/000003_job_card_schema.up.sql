@@ -1,5 +1,4 @@
-CREATE TABLE job_cards (
-    -- Using the external ID from the site as the Primary Key
+CREATE TABLE extracted_jobdata(
     id SERIAL PRIMARY KEY, 
     
     title TEXT NOT NULL,
@@ -12,19 +11,21 @@ CREATE TABLE job_cards (
     -- Descriptions can be long, so TEXT is safer than VARCHAR
     description TEXT, 
     
-    -- URLs can exceed 255 chars, use TEXT
-    url TEXT NOT NULL,
+    -- Single link field to match ExtractedJobData.Link
     link TEXT,
-    classification TEXT,
     
-    -- TIMESTAMPTZ handles timezones automatically
-    update_date TIMESTAMPTZ,
-    scrape_date TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    -- Store skills as comma-separated string or JSONB array
+    skills TEXT,
     
-    -- Track when the row itself was last modified in your DB
-    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    -- Track when the row was created
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Index for faster searching by company or title
-CREATE INDEX idx_job_company ON job_cards(company);
-CREATE INDEX idx_job_title ON job_cards(title);
+CREATE INDEX idx_extracted_jobdata_company ON extracted_jobdata(company);
+CREATE INDEX idx_extracted_jobdata_title ON extracted_jobdata(title);
+CREATE INDEX idx_extracted_jobdata_link ON extracted_jobdata(link);
+
+ALTER TABLE extracted_jobdata 
+ADD CONSTRAINT unique_job_link UNIQUE (link);

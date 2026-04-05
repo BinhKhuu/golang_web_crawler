@@ -3,24 +3,27 @@ package storage
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"golangwebcrawler/internal/dbstore"
 	"golangwebcrawler/internal/models"
+	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/lib/pq"
 )
 
 type ParserStorageService struct {
-	db *sql.DB
+	db     *sql.DB
+	logger *slog.Logger
 }
 
-// NewDBStorageService Todo return error.
-func NewDBStorageService(db *sql.DB) *ParserStorageService {
-	return &ParserStorageService{db: db}
+func NewDBStorageService(db *sql.DB, logger *slog.Logger) *ParserStorageService {
+	return &ParserStorageService{db: db, logger: logger}
 }
 
-func (s *ParserStorageService) GetLatestRawData(startDate time.Time) ([]models.RawData, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), dbstore.QueryTimeout)
+func (s *ParserStorageService) GetLatestRawData(ctx context.Context, startDate time.Time) ([]models.RawData, error) {
+	ctx, cancel := context.WithTimeout(ctx, dbstore.QueryTimeout)
 	defer cancel()
 
 	rows, err := s.db.QueryContext(ctx,
@@ -35,7 +38,7 @@ func (s *ParserStorageService) GetLatestRawData(startDate time.Time) ([]models.R
 	var results []models.RawData
 	for rows.Next() {
 		var r models.RawData
-		if err := rows.Scan(&r.URL, &r.ContentType, &r.Raw_content); err != nil {
+		if err := rows.Scan(&r.URL, &r.ContentType, &r.RawContent); err != nil {
 			return nil, err
 		}
 		results = append(results, r)
@@ -47,8 +50,8 @@ func (s *ParserStorageService) GetLatestRawData(startDate time.Time) ([]models.R
 	return results, nil
 }
 
-func (s *ParserStorageService) StoreJobListingData(result models.JobListing) error {
-	ctx, cancel := context.WithTimeout(context.Background(), dbstore.QueryTimeout)
+func (s *ParserStorageService) StoreJobListingData(ctx context.Context, result models.JobListing) error {
+	ctx, cancel := context.WithTimeout(ctx, dbstore.QueryTimeout)
 	defer cancel()
 
 	_, err := s.db.ExecContext(
@@ -60,16 +63,105 @@ func (s *ParserStorageService) StoreJobListingData(result models.JobListing) err
 	return err
 }
 
-func (s *ParserStorageService) StoreJobCardData(result models.JobCard) error {
-	ctx, cancel := context.WithTimeout(context.Background(), dbstore.QueryTimeout)
+func (s *ParserStorageService) StoreExtractedJobDataBatchUpSert(ctx context.Context, results []models.ExtractedJobData) error {
+	if len(results) == 0 {
+		return nil
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, dbstore.QueryTimeout)
 	defer cancel()
 
-	_, err := s.db.ExecContext(
-		ctx,
-		`INSERT INTO job_cards (title, company, location, salary, description, url, link, classification, update_date, scrape_date, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())`,
-		result.Title, result.Company, result.Location, result.Salary, result.Description, result.URL, result.Link, result.Classification, result.UpdateDate, result.ScrapeDate,
-	)
+	txn, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
 
-	return err
+	defer func() {
+		rollbackErr := txn.Rollback()
+		if rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) {
+			s.logger.Error("Failed to rollback transaction", "error", rollbackErr)
+		}
+	}()
+
+	query := `
+		INSERT INTO extracted_jobdata (title, company, location, salary, description, link, skills)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		ON CONFLICT (link) 
+		DO UPDATE SET 
+			title = EXCLUDED.title,
+			company = EXCLUDED.company,
+			location = EXCLUDED.location,
+			salary = EXCLUDED.salary,
+			description = EXCLUDED.description,
+			skills = EXCLUDED.skills,
+			updated_at = NOW();
+	`
+
+	stmt, err := txn.PrepareContext(ctx, query)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	for _, result := range results {
+		skills := strings.Join(result.Skills, ",")
+		_, err = stmt.ExecContext(ctx,
+			result.Title,
+			result.Company,
+			result.Location,
+			result.Salary,
+			result.Description,
+			result.Link,
+			skills,
+		)
+		if err != nil {
+			return err
+		}
+	}
+
+	return txn.Commit()
+}
+
+func (s *ParserStorageService) StoreExtractedJobDataBatch(ctx context.Context, results []models.ExtractedJobData) error {
+	if len(results) == 0 {
+		return nil
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, dbstore.QueryTimeout)
+	defer cancel()
+
+	txn, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		rollbackErr := txn.Rollback()
+		if rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) {
+			s.logger.Error("Failed to rollback transaction", "error", rollbackErr)
+		}
+	}()
+
+	stmt, err := txn.PrepareContext(ctx, pq.CopyIn("extracted_jobdata",
+		"title", "company", "location", "salary", "description", "link", "skills"))
+	if err != nil {
+		return err
+	}
+
+	for _, result := range results {
+		skills := strings.Join(result.Skills, ",")
+		_, err = stmt.ExecContext(ctx, result.Title, result.Company, result.Location,
+			result.Salary, result.Description, result.Link, skills)
+		if err != nil {
+			return err
+		}
+	}
+
+	defer func() {
+		if err = stmt.Close(); err != nil {
+			s.logger.Error("Failed to close statement", "error", err)
+			return
+		}
+	}()
+
+	return txn.Commit()
 }

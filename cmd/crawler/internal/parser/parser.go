@@ -2,6 +2,7 @@ package parser
 
 import (
 	"bytes"
+	"context"
 
 	"github.com/PuerkitoBio/goquery"
 )
@@ -12,7 +13,13 @@ func NewHTTPParser() *HTTPParser {
 	return &HTTPParser{}
 }
 
-func (p *HTTPParser) ParseLinks(body []byte) ([]string, error) {
+func (p *HTTPParser) ParseLinks(ctx context.Context, body []byte) ([]string, error) {
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+	}
+
 	links := make([]string, 0)
 	r := bytes.NewReader(body)
 

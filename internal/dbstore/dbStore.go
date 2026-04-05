@@ -10,6 +10,18 @@ import (
 	"time"
 )
 
+const (
+	defaultMaxOpenConns     = 25
+	defaultMaxIdleConns     = 10
+	defaultConnMaxLifetime  = 5 * time.Minute
+	httpTimeout             = 30 * time.Second
+	httpMaxIdleConns        = 100
+	httpMaxIdleConnsPerHost = 10
+	httpIdleConnTimeout     = 90 * time.Second
+	defaultConcurrency      = 10
+	defaultMaxDepth         = 3
+)
+
 const QueryTimeout = 5 * time.Second
 
 type DBStorageService struct {
@@ -62,6 +74,10 @@ func SetupDatabase() (*sql.DB, error) {
 	if err := conn.PingContext(ctx); err != nil {
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
+
+	conn.SetMaxOpenConns(defaultMaxOpenConns)
+	conn.SetMaxIdleConns(defaultMaxIdleConns)
+	conn.SetConnMaxLifetime(defaultConnMaxLifetime)
 
 	return conn, nil
 }

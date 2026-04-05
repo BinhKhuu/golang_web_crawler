@@ -2,6 +2,7 @@ package fetcher
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"io"
 	"net/http"
@@ -9,21 +10,13 @@ import (
 	"time"
 )
 
-type MockHTTPClient_Success struct {
+type MockHTTPClient struct {
 	Response *http.Response
 	Err      error
 }
 
-func (m *MockHTTPClient_Success) Get(url string) (*http.Response, error) {
+func (m *MockHTTPClient) Do(req *http.Request) (*http.Response, error) {
 	return m.Response, m.Err
-}
-
-type MockHTTPClient_Error struct {
-	Err error
-}
-
-func (m *MockHTTPClient_Error) Get(url string) (*http.Response, error) {
-	return nil, m.Err
 }
 
 func TestHTTPFetcher_Fetch(t *testing.T) {
@@ -31,11 +24,11 @@ func TestHTTPFetcher_Fetch(t *testing.T) {
 		StatusCode: http.StatusOK,
 		Body:       io.NopCloser(bytes.NewBufferString("mock body")),
 	}
-	mockClient := &MockHTTPClient_Success{Response: mockResponse, Err: nil}
+	mockClient := &MockHTTPClient{Response: mockResponse, Err: nil}
 	fetcher := NewHTTPFetcher(mockClient)
 
 	const url = "http://example.com"
-	result, err := fetcher.Fetch(url)
+	result, err := fetcher.Fetch(t.Context(), url)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -55,11 +48,11 @@ func TestHTTPFetcher_Fetch(t *testing.T) {
 
 func Test_HTTPFetcher_Error(t *testing.T) {
 	mockError := errors.New("mock error")
-	mockClient := &MockHTTPClient_Error{Err: mockError}
+	mockClient := &MockHTTPClient{Err: mockError}
 	fetcher := NewHTTPFetcher(mockClient)
 	const url = "http://example.com"
 
-	_, err := fetcher.Fetch(url)
+	_, err := fetcher.Fetch(t.Context(), url)
 	if err == nil {
 		t.Fatalf("expected error")
 	}
@@ -81,8 +74,8 @@ func Test_HTTPFetcher_Fetch_Http_404(t *testing.T) {
 
 	fetcher := NewHTTPFetcher(client)
 
-	const url = "https://tools-httpstatus.pickup-services.com/404"
-	result, err := fetcher.Fetch(url)
+	const url = "https://httpbin.org/404"
+	result, err := fetcher.Fetch(t.Context(), url)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -95,17 +88,19 @@ func Test_HTTPFetcher_Fetch_Http_404(t *testing.T) {
 	}
 }
 
-func Test_HTTPFetcher_Fetch_Error(t *testing.T) {
-	mockError := &MockHTTPClient_Error{Err: http.ErrHandlerTimeout}
-	fetcher := NewHTTPFetcher(mockError)
-
-	const url = "http://example.com"
-	_, err := fetcher.Fetch(url)
-	if err == nil {
-		t.Fatalf("expected an error, got nil")
+func Test_HTTPFetcher_Fetch_ContextCancelled(t *testing.T) {
+	client := &http.Client{
+		Timeout: 10 * time.Second,
 	}
 
-	if !errors.Is(err, http.ErrHandlerTimeout) {
-		t.Errorf("expected error %v, got %v", http.ErrHandlerTimeout, err)
+	fetcher := NewHTTPFetcher(client)
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	const url = "http://example.com"
+	_, err := fetcher.Fetch(ctx, url)
+	if err == nil {
+		t.Fatalf("expected an error due to cancelled context, got nil")
 	}
 }

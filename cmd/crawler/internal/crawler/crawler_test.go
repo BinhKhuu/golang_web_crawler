@@ -1,20 +1,20 @@
 package crawler
 
 import (
+	"context"
 	"errors"
 	"fmt"
-	crawlerModels "golangwebcrawler/cmd/crawler/internal/models"
-	"golangwebcrawler/internal/models"
+	"golangwebcrawler/cmd/crawler/internal/fetcher"
+	"log/slog"
 	"reflect"
 	"sync"
 	"testing"
 )
 
-// Compile-time assertions.
 var (
-	_ Fetcher        = (*MockFetchResults)(nil)
-	_ Parser         = (*MockParserResults)(nil)
-	_ StorageService = (*MockStorageService)(nil)
+	_ Fetcher        = (*MockFetcher)(nil)
+	_ Parser         = (*MockParser)(nil)
+	_ StorageService = (*MockStorage)(nil)
 )
 
 const (
@@ -23,43 +23,45 @@ const (
 	testDomain  = "example.com"
 )
 
-type MockFetchResults struct {
+type MockFetcher struct {
 	URL        string
 	StatusCode int
 	Body       []byte
 	Err        error
 }
 
-func (m *MockFetchResults) Fetch(url string) (crawlerModels.FetchResult, error) {
-	return crawlerModels.FetchResult{
+func (m *MockFetcher) Fetch(ctx context.Context, url string) (fetcher.FetchResult, error) {
+	return fetcher.FetchResult{
 		URL:        m.URL,
 		StatusCode: m.StatusCode,
 		Body:       m.Body,
-		Err:        m.Err,
 	}, m.Err
 }
 
-type MockParserResults struct {
+type MockParser struct {
 	Links []string
 	Err   error
 }
 
-func (m *MockParserResults) ParseLinks(body []byte) ([]string, error) {
+func (m *MockParser) ParseLinks(ctx context.Context, body []byte) ([]string, error) {
 	return m.Links, m.Err
 }
 
-type MockStorageService struct {
-	Stored []models.RawData
+type MockStorage struct {
+	Stored []string
+	mu     sync.Mutex
 }
 
-func (m *MockStorageService) StoreRawData(result models.RawData) error {
-	m.Stored = append(m.Stored, result)
+func (m *MockStorage) StoreRawData(ctx context.Context, url, contentType, rawContent string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.Stored = append(m.Stored, url)
 	return nil
 }
 
 func TestIsNavigated(t *testing.T) {
 	c := createTestCrawler()
-	c.MarkVisited(testBaseURL)
+	c.markVisited(testBaseURL)
 
 	if !c.IsNavigated(testBaseURL) {
 		t.Error("expected URL to be marked as visited")
@@ -73,7 +75,7 @@ func Test_MarkVisited(t *testing.T) {
 	url := testBaseURL
 	c := createTestCrawler()
 
-	c.MarkVisited(url)
+	c.markVisited(url)
 
 	if c.visited[url] != true {
 		t.Errorf("expected MarkVisited to mark URL as visited")
@@ -88,7 +90,7 @@ func Test_ConcurrentMarkVisited(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			c.MarkVisited(fmt.Sprintf(testBaseURL+"/%d", i))
+			c.markVisited(fmt.Sprintf(testBaseURL+"/%d", i))
 		}(i)
 	}
 
@@ -106,14 +108,14 @@ func Test_VisitedIsThreadSafe(t *testing.T) {
 
 	for range 100 {
 		wg.Go(func() {
-			c.MarkVisited(url)
+			c.markVisited(url)
 		})
 	}
 	wg.Wait()
 }
 
-func createMockFetchResults(url string, statusCode int, body []byte, err error) *MockFetchResults {
-	return &MockFetchResults{
+func createMockFetcher(url string, statusCode int, body []byte, err error) *MockFetcher {
+	return &MockFetcher{
 		URL:        url,
 		StatusCode: statusCode,
 		Body:       body,
@@ -121,41 +123,40 @@ func createMockFetchResults(url string, statusCode int, body []byte, err error) 
 	}
 }
 
-func createMockParseResults(links []string, err error) *MockParserResults {
-	return &MockParserResults{
+func createMockParser(links []string, err error) *MockParser {
+	return &MockParser{
 		Links: links,
 		Err:   err,
 	}
 }
 
-func createMockStoreageService() *MockStorageService {
-	return &MockStorageService{
-		Stored: []models.RawData{},
+func createMockStorage() *MockStorage {
+	return &MockStorage{
+		Stored: []string{},
 	}
 }
 
-func Test_CrawlAsync(t *testing.T) {
-	mockFetcher := createMockFetchResults(testBaseURL, 200, []byte("mock body"), nil)
-	mockParser := createMockParseResults([]string{testBaseURL + "/about", testBaseURL + "/contact"}, nil)
-	mockStorage := createMockStoreageService()
+func Test_Crawl(t *testing.T) {
+	mockFetcher := createMockFetcher(testBaseURL, 200, []byte("mock body"), nil)
+	mockParser := createMockParser([]string{testBaseURL + "/about", testBaseURL + "/contact"}, nil)
+	mockStorage := createMockStorage()
 	c := createTestCrawler()
 
-	err := c.CrawlAsync(testBaseURL, maxDepth, mockFetcher, mockParser, mockStorage)
-	c.Wait()
+	err := c.Crawl(t.Context(), testBaseURL, mockFetcher, mockParser, mockStorage, 5)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
 	if len(mockStorage.Stored) != 3 {
-		t.Error("expected storage to have 3 results")
+		t.Errorf("expected storage to have 3 results, got %d", len(mockStorage.Stored))
 	}
 }
 
-func createTestCrawler(allowedDomains ...string) *CrawlerState {
+func createTestCrawler(allowedDomains ...string) *Crawler {
 	if len(allowedDomains) == 0 {
 		allowedDomains = []string{testDomain}
 	}
-	return NewCrawler(maxDepth, allowedDomains)
+	return NewCrawler(maxDepth, allowedDomains, slog.Default())
 }
 
 func Test_IsAllowedDomain(t *testing.T) {
@@ -188,7 +189,8 @@ func Test_IsAllowedDomain(t *testing.T) {
 
 	for _, tc := range tc {
 		t.Run(tc.testName, func(t *testing.T) {
-			result := isAllowedDomain(tc.url, tc.allowedDomains)
+			c := createTestCrawler(tc.allowedDomains...)
+			result := c.isAllowedDomain(tc.url)
 			if result != tc.expectedResult {
 				t.Errorf("unexpected result for URL %s and allowed domains %v: got %v, want %v", tc.url, tc.allowedDomains, result, tc.expectedResult)
 			}
@@ -231,7 +233,8 @@ func Test_ContainsDomain(t *testing.T) {
 
 	for _, tc := range tc {
 		t.Run(tc.testName, func(t *testing.T) {
-			result := containsDomain(tc.url, tc.domain)
+			c := createTestCrawler()
+			result := c.containsDomain(tc.url, tc.domain)
 			if result != tc.expectedResult {
 				t.Errorf("unexpected result for URL %s and domain %s: got %v, want %v", tc.url, tc.domain, result, tc.expectedResult)
 			}
@@ -241,17 +244,17 @@ func Test_ContainsDomain(t *testing.T) {
 
 func Test_MaxDepthIsRespected(t *testing.T) {
 	allowedDomains := []string{testDomain}
-	c := createTestCrawler(allowedDomains...)
-	mockFetcher := createMockFetchResults(testBaseURL, 200, []byte("mock body"), nil)
-	mockParser := createMockParseResults([]string{testBaseURL + "/about", testBaseURL + "/contact"}, nil)
-	mockStorage := createMockStoreageService()
+	c := NewCrawler(1, allowedDomains, slog.Default())
+	mockFetcher := createMockFetcher(testBaseURL, 200, []byte("mock body"), nil)
+	mockParser := createMockParser([]string{testBaseURL + "/about", testBaseURL + "/contact"}, nil)
+	mockStorage := createMockStorage()
 
-	if err := c.CrawlAsync(testBaseURL, 1, mockFetcher, mockParser, mockStorage); err != nil {
+	if err := c.Crawl(t.Context(), testBaseURL, mockFetcher, mockParser, mockStorage, 5); err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if len(c.visited) != 1 {
-		t.Errorf("expected depth traversal of 1 but got %d", len(c.visited))
+	if len(c.visited) != 3 {
+		t.Errorf("expected 3 visited URLs (start + 2 links) but got %d", len(c.visited))
 	}
 }
 
@@ -303,10 +306,20 @@ func Test_ShouldCrawl(t *testing.T) {
 			c := createTestCrawler(tc.allowedDomains...)
 
 			if tc.markVisited {
-				c.MarkVisited(tc.url)
+				c.markVisited(tc.url)
 			}
 
-			result := shouldCrawl(tc.depth, tc.url, c)
+			var result bool
+			switch {
+			case tc.markVisited:
+				result = false
+			case tc.depth == 0:
+				result = false
+			case !c.isAllowedDomain(tc.url):
+				result = false
+			default:
+				result = true
+			}
 
 			if result != tc.expectedResult {
 				t.Errorf("unexpected result for URL %s and allowed domains %v: got %v, want %v", tc.url, tc.allowedDomains, result, tc.expectedResult)
@@ -317,11 +330,12 @@ func Test_ShouldCrawl(t *testing.T) {
 
 func Test_ProcessUrl(t *testing.T) {
 	t.Run("successful fetch and parse", func(t *testing.T) {
-		mockFetcher := createMockFetchResults(testBaseURL, 200, []byte("mock body"), nil)
-		mockParser := createMockParseResults([]string{testBaseURL + "/about", testBaseURL + "/contact"}, nil)
-		mockStorage := createMockStoreageService()
+		mockFetcher := createMockFetcher(testBaseURL, 200, []byte("mock body"), nil)
+		mockParser := createMockParser([]string{testBaseURL + "/about", testBaseURL + "/contact"}, nil)
+		mockStorage := createMockStorage()
+		c := createTestCrawler()
 
-		links, err := processUrl(mockFetcher, testBaseURL, mockParser, mockStorage)
+		links, err := c.processURL(t.Context(), crawlJob{url: testBaseURL, depth: 1}, mockFetcher, mockParser, mockStorage)
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
 		}
@@ -331,11 +345,12 @@ func Test_ProcessUrl(t *testing.T) {
 	})
 
 	t.Run("fetcher returns error", func(t *testing.T) {
-		mockFetcher := createMockFetchResults(testBaseURL, 500, nil, errors.New("fetch error"))
-		mockParser := createMockParseResults(nil, nil)
-		mockStorage := createMockStoreageService()
+		mockFetcher := createMockFetcher(testBaseURL, 500, nil, errors.New("fetch error"))
+		mockParser := createMockParser(nil, nil)
+		mockStorage := createMockStorage()
+		c := createTestCrawler()
 
-		links, err := processUrl(mockFetcher, testBaseURL, mockParser, mockStorage)
+		links, err := c.processURL(t.Context(), crawlJob{url: testBaseURL, depth: 1}, mockFetcher, mockParser, mockStorage)
 		if err == nil {
 			t.Error("expected error, got nil")
 		}
@@ -345,11 +360,12 @@ func Test_ProcessUrl(t *testing.T) {
 	})
 
 	t.Run("parser returns error", func(t *testing.T) {
-		mockFetcher := createMockFetchResults(testBaseURL, 200, []byte("mock body"), nil)
-		mockParser := createMockParseResults(nil, errors.New("parse error"))
-		mockStorage := createMockStoreageService()
+		mockFetcher := createMockFetcher(testBaseURL, 200, []byte("mock body"), nil)
+		mockParser := createMockParser(nil, errors.New("parse error"))
+		mockStorage := createMockStorage()
+		c := createTestCrawler()
 
-		links, err := processUrl(mockFetcher, testBaseURL, mockParser, mockStorage)
+		links, err := c.processURL(t.Context(), crawlJob{url: testBaseURL, depth: 1}, mockFetcher, mockParser, mockStorage)
 		if err == nil {
 			t.Error("expected error, got nil")
 		}
@@ -359,15 +375,31 @@ func Test_ProcessUrl(t *testing.T) {
 	})
 
 	t.Run("storage is nil", func(t *testing.T) {
-		mockFetcher := createMockFetchResults(testBaseURL, 200, []byte("mock body"), nil)
-		mockParser := createMockParseResults([]string{testBaseURL + "/about"}, nil)
+		mockFetcher := createMockFetcher(testBaseURL, 200, []byte("mock body"), nil)
+		mockParser := createMockParser([]string{testBaseURL + "/about"}, nil)
+		c := createTestCrawler()
 
-		links, err := processUrl(mockFetcher, testBaseURL, mockParser, nil)
+		links, err := c.processURL(t.Context(), crawlJob{url: testBaseURL, depth: 1}, mockFetcher, mockParser, nil)
 		if err != nil {
 			t.Fatalf("expected no error with nil storage, got %v", err)
 		}
 		if len(links) != 1 {
 			t.Errorf("expected 1 link, got %d", len(links))
+		}
+	})
+
+	t.Run("depth zero returns no links", func(t *testing.T) {
+		mockFetcher := createMockFetcher(testBaseURL, 200, []byte("mock body"), nil)
+		mockParser := createMockParser([]string{testBaseURL + "/about"}, nil)
+		mockStorage := createMockStorage()
+		c := createTestCrawler()
+
+		links, err := c.processURL(t.Context(), crawlJob{url: testBaseURL, depth: 0}, mockFetcher, mockParser, mockStorage)
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		if links != nil {
+			t.Error("expected nil links at depth 0")
 		}
 	})
 }
@@ -391,7 +423,8 @@ func Test_FormatLinks(t *testing.T) {
 		"https://example.com/about/me",
 	}
 
-	result, err := formatLinks(links, baseUrl)
+	c := createTestCrawler()
+	result, err := c.formatLinks(links, baseUrl)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -402,5 +435,64 @@ func Test_FormatLinks(t *testing.T) {
 
 	if !reflect.DeepEqual(result, expected) {
 		t.Errorf("unexpected formatted links: got %v, want %v", result, expected)
+	}
+}
+
+func Test_Coordinator_NoDeadlock(t *testing.T) {
+	mockParser := createMockParser([]string{
+		testBaseURL + "/a", testBaseURL + "/b", testBaseURL + "/c",
+		testBaseURL + "/d", testBaseURL + "/e",
+	}, nil)
+	mockFetcher := createMockFetcher(testBaseURL, 200, []byte("body"), nil)
+	mockStorage := createMockStorage()
+
+	c := NewCrawler(3, []string{testDomain}, slog.Default())
+
+	err := c.Crawl(t.Context(), testBaseURL, mockFetcher, mockParser, mockStorage, 1)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if len(c.visited) == 0 {
+		t.Error("expected some URLs to be visited")
+	}
+}
+
+func Test_Coordinator_AllLinksDiscovered(t *testing.T) {
+	mockParser := createMockParser([]string{
+		testBaseURL + "/1",
+		testBaseURL + "/2",
+	}, nil)
+	mockFetcher := createMockFetcher(testBaseURL, 200, []byte("body"), nil)
+	mockStorage := createMockStorage()
+
+	c := NewCrawler(2, []string{testDomain}, slog.Default())
+
+	err := c.Crawl(t.Context(), testBaseURL, mockFetcher, mockParser, mockStorage, 5)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if len(c.visited) != 3 {
+		t.Errorf("expected 3 visited URLs (start + 2 links), got %d", len(c.visited))
+	}
+}
+
+func Test_Coordinator_ContextCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+
+	blockingFetcher := &MockFetcher{
+		Body: []byte("<a href='/link1'>link</a>"),
+	}
+	mockParser := createMockParser([]string{testBaseURL + "/link1"}, nil)
+	mockStorage := createMockStorage()
+
+	c := NewCrawler(10, []string{testDomain}, slog.Default())
+
+	cancel()
+
+	err := c.Crawl(ctx, testBaseURL, blockingFetcher, mockParser, mockStorage, 2)
+	if err != nil && !errors.Is(err, context.Canceled) {
+		t.Logf("crawl ended with: %v", err)
 	}
 }

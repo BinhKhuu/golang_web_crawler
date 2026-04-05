@@ -1,15 +1,17 @@
 package parser
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
-	"golangwebcrawler/cmd/parser/internal/storage"
+	"golangwebcrawler/internal/llm"
 	"golangwebcrawler/internal/models"
 )
 
 type Parser[T any] interface {
-	Parse(html string) (T, error)
+	ParseLLM(ctx context.Context, html string) ([]models.ExtractedJobData, error)
+	ParseQuery(ctx context.Context, html string) ([]models.ExtractedJobData, error)
 }
 
 var (
@@ -19,10 +21,13 @@ var (
 
 func NewParser[T any](db *sql.DB) (Parser[T], error) {
 	var zero T
-	storageService := storage.NewDBStorageService(db) // todo maybe this should be a parameter to newparser
+	llmService, err := llm.NewLLMService()
+	if err != nil {
+		return nil, err
+	}
 	switch any(zero).(type) {
 	case models.JobListing:
-		p := NewJobListingParser(*storageService)
+		p := NewJobListingParser(llmService)
 		if typed, ok := any(p).(Parser[T]); ok {
 			return typed, nil
 		}

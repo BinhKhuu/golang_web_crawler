@@ -1,47 +1,83 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"golangwebcrawler/cmd/parser/internal/parser"
 	"golangwebcrawler/internal/dbstore"
 	"golangwebcrawler/internal/models"
-	"log"
+	"golangwebcrawler/internal/storage"
+	"log/slog"
+	"os"
 
 	"github.com/joho/godotenv"
 )
 
-// This is a simple test to ensure the parser can be created and used without panicking. It does not test the actual parsing logic, which should be covered by unit tests in the parser package.
 func main() {
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
+
 	err := Load("../../.env")
 	if err != nil {
-		log.Printf("Error loading .env file: %v\n", err)
+		logger.Error("Error loading .env file", "error", err)
 		return
 	}
 
 	db, err := InitDb()
 	if err != nil {
-		log.Fatalf("Failed to initialize database: %v", err)
+		logger.Error("Failed to initialize database", "error", err)
+		return
 	}
-	j, err := ParseJobListing("<html><body><h1>Sample Job Listing</h1></body></html>", db)
+	defer db.Close()
+
+	htmlContent, err := os.ReadFile("./internal/parser/test/testcard.txt")
 	if err != nil {
-		log.Fatalf("Failed to parse job listing: %v", err)
+		logger.Error("Failed to read testcard.txt", "error", err)
+		return
 	}
-	log.Printf("Parsed Job Listing: %+v", j)
+
+	j, err := ParseJobListing(context.Background(), string(htmlContent), db, logger)
+	if err != nil {
+		logger.Error("Failed to parse job listing", "error", err)
+	}
+	logger.Info("Parsed Job Listing", "job", j)
 }
 
-func ParseJobListing(html string, db *sql.DB) (models.JobListing, error) {
+func ParseJobListing(ctx context.Context, html string, db *sql.DB, logger *slog.Logger) (models.JobListing, error) {
+	storageService := storage.NewService(db, logger)
 	p, err := parser.NewParser[models.JobListing](db)
 	if err != nil {
-		log.Printf("Failed to create parser: %v", err)
-		return models.JobListing{}, err
+		logger.Error("Failed to create parser", "error", err)
+		return models.JobListing{
+			Title: "Error",
+		}, err
 	}
-	j, err := p.Parse(html)
+	j, err := p.ParseLLM(ctx, html)
 	if err != nil {
-		log.Printf("Failed to parse HTML: %v", err)
+		logger.Error("Failed to parse HTML", "error", err)
 		return models.JobListing{}, err
 	}
-	return j, nil
+
+	extracted := make([]storage.ExtractedJobData, len(j))
+	for i, item := range j {
+		extracted[i] = storage.ExtractedJobData{
+			Title:       item.Title,
+			Company:     item.Company,
+			Location:    item.Location,
+			Salary:      item.Salary,
+			Description: item.Description,
+			Skills:      item.Skills,
+			Link:        item.Link,
+		}
+	}
+
+	err = storageService.StoreExtractedJobDataBatchUpSert(ctx, extracted)
+	if err != nil {
+		logger.Error("Failed to store extracted job data", "error", err)
+		return models.JobListing{}, err
+	}
+	logger.Info("Parsed Job Data", "data", j)
+	return models.JobListing{}, nil
 }
 
 func Load(envFile string) error {
@@ -54,8 +90,7 @@ func Load(envFile string) error {
 func InitDb() (*sql.DB, error) {
 	database, err := dbstore.SetupDatabase()
 	if err != nil {
-		log.Printf("error setting up database: %v\n", err)
-		return nil, err
+		return nil, fmt.Errorf("error setting up database: %w", err)
 	}
 
 	return database, nil
