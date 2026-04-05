@@ -1,3 +1,8 @@
+# TLDR
+1. Create the work tree ```git worktree ai-agent-task -b branchName```
+2. Commit work from agent ```git commit (from ai agent)```
+3. merge work from one to the other ```git merge worktreename```
+4. list current worktrees ```git worktree list```
 # Worktrees for AI Agents and Collaborators
 
 Purpose
