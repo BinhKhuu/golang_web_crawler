@@ -138,8 +138,8 @@ func (c *Crawler) coordinator(ctx context.Context, jobs chan<- crawlJob, discove
 			close(done)
 			return
 		case sendCh <- jobToSend: // is sendCh ready for a job
-			queue = queue[1:] // reshuffle the queue after sending a job
-		case batch := <-discovered: // discovered links from a worker add to queue
+			queue = queue[1:]
+		case batch := <-discovered: // goroutine discovered new links and pushed to discovered queue
 			pending--
 			for _, link := range batch.links {
 				if c.markVisited(link) {
@@ -148,11 +148,9 @@ func (c *Crawler) coordinator(ctx context.Context, jobs chan<- crawlJob, discove
 				}
 			}
 			if pending == 0 && len(queue) == 0 {
-				// wait 5 seconds for queue to be refilled before closing channels to help slow tasks return
 				idleTimer.Reset(resetSeconds * time.Second)
 			}
 		case <-idleTimer.C:
-			// If this fires, we have truly been idle for 5 seconds
 			if pending == 0 && len(queue) == 0 {
 				close(jobs)
 				workerWG.Wait()
