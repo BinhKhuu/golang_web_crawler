@@ -18,7 +18,7 @@ CREATE TABLE extracted_jobdata(
     skills TEXT,
     
     -- Track when the row was created
-    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
