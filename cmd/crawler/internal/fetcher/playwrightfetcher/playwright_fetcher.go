@@ -22,73 +22,11 @@ func NewPlaywrightFetcher(logger *slog.Logger) *PlaywrightFetcher {
 }
 
 // todo add channel and defer ctx close logic
-// todo refactor - browser options used to prevent bot detection
 func (f *PlaywrightFetcher) Fetch(ctx context.Context, url string) (crawler.FetchResult, error) {
-	pw, err := playwright.Run()
+	b, err := configurePlaywrightBrowser()
 	if err != nil {
 		return crawler.FetchResult{}, err
 	}
-
-	b, err := pw.Chromium.Launch(playwright.BrowserTypeLaunchOptions{
-		Headless: playwright.Bool(false), // Run in headed mode if possible
-		Args: []string{
-			"--disable-blink-features=AutomationControlled",
-			"--disable-features=IsolateOrigins,site-per-process",
-			"--disable-site-isolation-trials",
-			"--disable-web-security",
-			"--disable-features=BlockInsecurePrivateNetworkRequests",
-			"--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-		},
-	})
-	if err != nil {
-		return crawler.FetchResult{}, err
-	}
-
-	ops := playwright.BrowserNewContextOptions{
-		UserAgent:         playwright.String("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"),
-		Viewport:          &playwright.Size{Width: 1920, Height: 1080}, // Use ViewportSize pointer
-		Locale:            playwright.String("en-US"),
-		TimezoneId:        playwright.String("America/New_York"),
-		Permissions:       []string{"geolocation", "notifications"}, // Add notifications to look more "human"
-		JavaScriptEnabled: playwright.Bool(true),
-
-		// Add these to prevent 'nil' errors in the driver's internal logic:
-		IgnoreHttpsErrors: playwright.Bool(true),
-		HasTouch:          playwright.Bool(false),
-	}
-
-	// 2. More comprehensive script injection
-	bctx, err := b.NewContext(ops)
-	if err != nil {
-		return crawler.FetchResult{}, err
-	}
-
-	// 3. Enhanced stealth scripts
-	bctx.AddInitScript(playwright.Script{
-		Content: playwright.String(`
-            // Remove webdriver property
-            Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
-            
-            // Override plugins length
-            Object.defineProperty(navigator, 'plugins', {get: () => [1, 2, 3, 4, 5]});
-            
-            // Override languages
-            Object.defineProperty(navigator, 'languages', {get: () => ['en-US', 'en']});
-            
-            // Chrome runtime
-            window.chrome = {
-                runtime: {}
-            };
-            
-            // Permissions
-            const originalQuery = window.navigator.permissions.query;
-            window.navigator.permissions.query = (parameters) => (
-                parameters.name === 'notifications' ?
-                    Promise.resolve({state: Notification.permission}) :
-                    originalQuery(parameters)
-            );
-        `),
-	})
 
 	p, err := b.NewPage()
 	// 4. Add random delays and human-like behavior
@@ -122,4 +60,75 @@ func (f *PlaywrightFetcher) Fetch(ctx context.Context, url string) (crawler.Fetc
 	}
 
 	return crawler.FetchResult{}, nil
+}
+
+// configurePlaywrightBrowser sets up a Playwright browser instance with enhanced stealth options to better mimic human behavior and avoid detection by anti-bot measures.
+// will launch a browser in headed mode
+func configurePlaywrightBrowser() (playwright.Browser, error) {
+	pw, err := playwright.Run()
+	if err != nil {
+		return nil, err
+	}
+
+	b, err := pw.Chromium.Launch(playwright.BrowserTypeLaunchOptions{
+		Headless: playwright.Bool(false), // Run in headed mode if possible
+		Args: []string{
+			"--disable-blink-features=AutomationControlled",
+			"--disable-features=IsolateOrigins,site-per-process",
+			"--disable-site-isolation-trials",
+			"--disable-web-security",
+			"--disable-features=BlockInsecurePrivateNetworkRequests",
+			"--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	ops := playwright.BrowserNewContextOptions{
+		UserAgent:         playwright.String("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"),
+		Viewport:          &playwright.Size{Width: 1920, Height: 1080}, // Use ViewportSize pointer
+		Locale:            playwright.String("en-US"),
+		TimezoneId:        playwright.String("America/New_York"),
+		Permissions:       []string{"geolocation", "notifications"}, // Add notifications to look more "human"
+		JavaScriptEnabled: playwright.Bool(true),
+
+		// Add these to prevent 'nil' errors in the driver's internal logic:
+		IgnoreHttpsErrors: playwright.Bool(true),
+		HasTouch:          playwright.Bool(false),
+	}
+
+	// 2. More comprehensive script injection
+	bctx, err := b.NewContext(ops)
+	if err != nil {
+		return nil, err
+	}
+
+	// 3. Enhanced stealth scripts
+	bctx.AddInitScript(playwright.Script{
+		Content: playwright.String(`
+            // Remove webdriver property
+            Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
+            
+            // Override plugins length
+            Object.defineProperty(navigator, 'plugins', {get: () => [1, 2, 3, 4, 5]});
+            
+            // Override languages
+            Object.defineProperty(navigator, 'languages', {get: () => ['en-US', 'en']});
+            
+            // Chrome runtime
+            window.chrome = {
+                runtime: {}
+            };
+            
+            // Permissions
+            const originalQuery = window.navigator.permissions.query;
+            window.navigator.permissions.query = (parameters) => (
+                parameters.name === 'notifications' ?
+                    Promise.resolve({state: Notification.permission}) :
+                    originalQuery(parameters)
+            );
+        `),
+	})
+	return b, nil
 }
