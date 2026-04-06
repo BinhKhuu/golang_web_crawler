@@ -106,8 +106,6 @@ func configurePlaywrightBrowser() (playwright.Browser, error) {
 		TimezoneId:        playwright.String("America/New_York"),
 		Permissions:       []string{"geolocation", "notifications"}, // Add notifications to look more "human"
 		JavaScriptEnabled: playwright.Bool(true),
-
-		// Add these to prevent 'nil' errors in the driver's internal logic:
 		IgnoreHttpsErrors: playwright.Bool(true),
 		HasTouch:          playwright.Bool(false),
 	}

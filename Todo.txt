@@ -3,8 +3,17 @@ todo:
     1. Playwright fetcher 
         - Investigate how to use playwright in go
         - Investigate how to navigate and do simple clicks (use seek)
+            - navigate through job links 
+            - try to make it robust
         - Investigate how to return network data 
-
+        - compare with ai agent 
+            ask it to use playwright
+                avoid bot detection
+                look for job id link 
+        - add notes on play wright bot detection 
+        - investigate if s logger is needed in the new params
+        - do i need to test playwright configuratior ? 
+            don't think so since its play wright implementation
 
     1. Parser Design 
         1. Parser needs to expect a model raw which has the domain website, use this to map the origin to the links for each job
