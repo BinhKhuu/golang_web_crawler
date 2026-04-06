@@ -40,3 +40,15 @@ git clone https://github.com/your-username/golangwebcrawler.git
 cd golangwebcrawler
 ```
 
+
+### playwright package
+playwright is used to 'smart crawl' installation requires installing all the playwright depdencides
+
+```
+go get github.com/playwright-community/playwright-go
+
+go run github.com/playwright-community/playwright-go/cmd/playwright@latest install --with-deps
+
+```
+
+* Drivers Playwright Go driver v1.57.0 installs ( version number is a sample )

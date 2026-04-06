@@ -1,4 +1,11 @@
 todo: 
+
+    1. Playwright fetcher 
+        - Investigate how to use playwright in go
+        - Investigate how to navigate and do simple clicks (use seek)
+        - Investigate how to return network data 
+
+
     1. Parser Design 
         1. Parser needs to expect a model raw which has the domain website, use this to map the origin to the links for each job
         1. figure out what the model for extract_jobdata should look like and how to map it to joblisting if needed 
@@ -57,3 +64,4 @@ todo:
         For Practice: Stick to Specialized models. It teaches you how to inspect the DOM, find unique selectors, and handle specific page layouts.
         For a Product: Start with a General parser that looks for application/ld+json first. It’s the "cheat code" of web scraping—it gives you clean, structured data (Title, Description, DatePosted) without you having to write site-specific code.
 
+    5. update go version

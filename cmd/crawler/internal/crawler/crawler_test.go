@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"golangwebcrawler/cmd/crawler/internal/fetcher"
 	"log/slog"
 	"reflect"
 	"sync"
@@ -30,8 +29,8 @@ type MockFetcher struct {
 	Err        error
 }
 
-func (m *MockFetcher) Fetch(ctx context.Context, url string) (fetcher.FetchResult, error) {
-	return fetcher.FetchResult{
+func (m *MockFetcher) Fetch(ctx context.Context, url string) (FetchResult, error) {
+	return FetchResult{
 		URL:        m.URL,
 		StatusCode: m.StatusCode,
 		Body:       m.Body,

@@ -3,7 +3,6 @@ package crawler
 import (
 	"context"
 	"fmt"
-	"golangwebcrawler/cmd/crawler/internal/fetcher"
 	"log/slog"
 	"net/url"
 	"strings"
@@ -12,7 +11,13 @@ import (
 )
 
 type Fetcher interface {
-	Fetch(ctx context.Context, url string) (fetcher.FetchResult, error)
+	Fetch(ctx context.Context, url string) (FetchResult, error)
+}
+
+type FetchResult struct {
+	URL        string
+	StatusCode int
+	Body       []byte
 }
 
 type Parser interface {
