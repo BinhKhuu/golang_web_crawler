@@ -15,7 +15,12 @@ func Test_Fetch(t *testing.T) {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
 		Level: slog.LevelDebug,
 	}))
-	fetcher := NewPlaywrightFetcher(logger)
+	config := DefaultConfig()
+	fetcher, err := NewPlaywrightFetcher(logger, &config)
+	if err != nil {
+		t.Fatalf("creating playwright fetcher: %v", err)
+	}
+
 	res, err := fetcher.Fetch(ctx, url)
 	if err != nil {
 		t.Fatalf("fetching url %s: %v", url, err)
@@ -28,4 +33,24 @@ func Test_Fetch(t *testing.T) {
 	if len(res.Body) == 0 {
 		t.Fatalf("expected non-empty body, got empty")
 	}
+}
+
+func Test_DefaultConfiguration(t *testing.T) {
+	config := DefaultConfig()
+	if config.URL == "" {
+		t.Errorf("expected default URL to be empty, got %s", config.URL)
+	}
+	if config.Timeout == 0 {
+		t.Errorf("expected default timeout to be %d, got %d", defaultTimeout, config.Timeout)
+	}
+
+	// rest of configuration can be empty as they are optional and depend on the target website.
+}
+
+// todo fill in.
+func Test_ConfigurePlaywrightBrowser(t *testing.T) {
+}
+
+// todo fill in.
+func Test_Close(t *testing.T) {
 }

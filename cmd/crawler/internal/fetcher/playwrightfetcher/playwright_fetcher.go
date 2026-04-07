@@ -2,31 +2,113 @@ package playwrightfetcher
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"golangwebcrawler/cmd/crawler/internal/crawler"
 	"log/slog"
 
 	"github.com/playwright-community/playwright-go"
 )
 
+var (
+	ErrPlaywrightClose = errors.New("closing playwright browser")
+	ErrPlaywrightStop  = errors.New("stopping playwright")
+)
+
+const defaultTimeout = 10000
+
 type PlaywrightFetcher struct {
-	logger *slog.Logger
+	logger      *slog.Logger
+	fetchConfig *PlaywrightFetcherConfig
+	pw          *playwright.Playwright
+	browser     playwright.Browser
+	browserCtx  playwright.BrowserContext
 }
 
-// todo decide if logger is needed.
-func NewPlaywrightFetcher(logger *slog.Logger) *PlaywrightFetcher {
-	return &PlaywrightFetcher{
-		logger: logger,
+/*
+PlaywrightFetcherConfig
+Leave query and selectors empty to skip the step.
+*/
+type PlaywrightFetcherConfig struct {
+	URL                   string   `json:"url"`
+	Headless              bool     `json:"headless"`
+	SearchInputSelectors  []string `json:"searchInputSelectors"`
+	SearchQuery           string   `json:"searchQuery"`
+	SearchSubmitSelectors []string `json:"searchSubmitSelectors"`
+	ResultsSelectors      []string `json:"resultsSelectors"`
+	DataSelectors         []string `json:"dataSelectors"`
+	SPAUpdateSelectors    []string `json:"spaUpdateSelectors"`
+	Timeout               int      `json:"timeout"`
+}
+
+func NewPlaywrightFetcher(logger *slog.Logger, fetchConfig *PlaywrightFetcherConfig) (*PlaywrightFetcher, error) {
+	f := &PlaywrightFetcher{
+		logger:      logger,
+		fetchConfig: fetchConfig,
 	}
+
+	err := f.configurePlaywrightBrowser()
+	if err != nil {
+		logger.Error("error configuring playwright browser", "error", err)
+		return nil, err
+	}
+	return f, nil
 }
 
 // todo add channel and defer ctx close logic.
+/*
+	1. Introduce a playwright configuration (and default configuration)
+		- inside configuration have selectors, searchquery, search submit selectors etc
+		- all the information needed for a configuration to target a specific website
+		- the fetcher will be generic and look for these selectors and store the information if it can
+		- might need a SPA configuration or SPA function thats separate from the regular page refresher
+			- spa will have better luck looking at network traffic to get the data
+	GUARD against nil configuration
+
+		if f.fetchConfig == nil {
+			return crawler.FetchResult{}, errors.New("fetch config is nil")
+		}
+
+		// slices - check before ranging or indexing
+		if len(f.fetchConfig.SearchInputSelectors) > 0 {
+			// do search input logic
+		}
+
+		if len(f.fetchConfig.SearchSubmitSelectors) > 0 {
+			// do search submit logic
+		}
+
+		if len(f.fetchConfig.ResultsSelectors) > 0 {
+			// do results logic
+		}
+
+		if len(f.fetchConfig.DataSelectors) > 0 {
+			// do data extraction logic
+		}
+
+		if len(f.fetchConfig.SPAUpdateSelectors) > 0 {
+			// do SPA logic
+		}
+	2. Add random delays and human-like behavior
+	3. the Fetch via playwright will be generice
+		1. Load page
+		2. Wait for dom to load and first selector to be available
+		3. Add cookies and email and promoto click acceptors
+		3. If Searching then run search confiruation
+		4. If Clicking run clicking configuration
+			- click selector
+			- look for details
+				- check html and network
+				- if details store
+
+
+*/
 func (f *PlaywrightFetcher) Fetch(ctx context.Context, url string) (crawler.FetchResult, error) {
-	b, err := configurePlaywrightBrowser()
-	if err != nil {
-		return crawler.FetchResult{}, err
+	if f.fetchConfig == nil {
+		return crawler.FetchResult{}, nil
 	}
 
-	p, err := b.NewPage()
+	p, err := f.browserCtx.NewPage()
 	if err != nil {
 		return crawler.FetchResult{}, err
 	}
@@ -39,15 +121,6 @@ func (f *PlaywrightFetcher) Fetch(ctx context.Context, url string) (crawler.Fetc
 	if err != nil {
 		return crawler.FetchResult{}, err
 	}
-
-	// // Random delay
-	// const alpha = 2000
-	// const beta = 1000
-	// time.Sleep(time.Duration(rand.N(alpha)+beta) * time.Millisecond)
-
-	// // Simulate mouse movement
-	// const mouseAlpha = 100
-	// p.Mouse().Move(float64(rand.N(mouseAlpha)), float64(rand.N(mouseAlpha)))
 
 	locator := p.Locator("a[id*='job-title']")
 
@@ -74,12 +147,27 @@ func (f *PlaywrightFetcher) Fetch(ctx context.Context, url string) (crawler.Fetc
 	return crawler.FetchResult{}, nil
 }
 
+// Close Call to prevent resource leaks. Should be deferred right after creating the fetcher instance.
+func (f *PlaywrightFetcher) Close() error {
+	if f.browser != nil {
+		if err := f.browser.Close(); err != nil {
+			return fmt.Errorf("%w: %w", ErrPlaywrightClose, err)
+		}
+	}
+	if f.pw != nil {
+		if err := f.pw.Stop(); err != nil {
+			return fmt.Errorf("%w: %w", ErrPlaywrightStop, err)
+		}
+	}
+	return nil
+}
+
 // configurePlaywrightBrowser sets up a Playwright browser instance with enhanced stealth options to better mimic human behavior and avoid detection by anti-bot measures.
 // will launch a browser in headed mode to prevent bot detection.
-func configurePlaywrightBrowser() (playwright.Browser, error) {
+func (f *PlaywrightFetcher) configurePlaywrightBrowser() error {
 	pw, err := playwright.Run()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	b, err := pw.Chromium.Launch(playwright.BrowserTypeLaunchOptions{
@@ -94,7 +182,7 @@ func configurePlaywrightBrowser() (playwright.Browser, error) {
 		},
 	})
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	const width = 1920
@@ -113,7 +201,7 @@ func configurePlaywrightBrowser() (playwright.Browser, error) {
 	// 2. More comprehensive script injection
 	bctx, err := b.NewContext(ops)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// 3. Enhanced stealth scripts
@@ -143,7 +231,45 @@ func configurePlaywrightBrowser() (playwright.Browser, error) {
         `),
 	})
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return b, nil
+
+	f.pw = pw
+	f.browser = b
+	f.browserCtx = bctx
+	return nil
+}
+
+func DefaultConfig() PlaywrightFetcherConfig {
+	return PlaywrightFetcherConfig{
+		URL:      "https://www.seek.com.au",
+		Headless: true,
+		SearchInputSelectors: []string{
+			"input[name=keywords]",
+			"input[placeholder*='Search']",
+		},
+		SearchQuery: "Software Engineer Jobs",
+		SearchSubmitSelectors: []string{
+			"button[type=submit]",
+			"button[aria-label='Search']",
+		},
+		ResultsSelectors: []string{
+			"a[data-automation='jobTitle']",
+			"a.job-link",
+			"a[data-testid='job-result']",
+		},
+		DataSelectors: []string{
+			"a[id*='job-title']",
+			"a[data-automation='jobTitle']",
+			".job-title a",
+			"article a[href*='/job/']",
+		},
+		SPAUpdateSelectors: []string{
+			"#job-details",
+			".JobDetail",
+			"[data-automation='jobDetail']",
+			".job-detail-content",
+		},
+		Timeout: defaultTimeout,
+	}
 }

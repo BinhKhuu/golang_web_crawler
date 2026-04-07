@@ -1,6 +1,9 @@
 todo: 
 
     1. Playwright fetcher 
+        - add playwright configuration
+            - use confiuration to look for elements and fetch data
+                
         - Investigate how to use playwright in go
         - Investigate how to navigate and do simple clicks (use seek)
             - navigate through job links 
@@ -15,6 +18,30 @@ todo:
         - do i need to test playwright configuratior ? 
             don't think so since its play wright implementation
 
+        - Update Main to select the type of fetcher through configuration for Crawler 
+            - the fetcher type can be base on the Command coming in from terminal OR from api OR from enviroment what every is constructing the crawler
+            Config-driven via env
+
+            type CrawlerConfig struct {
+                DBHost         string
+                DBPort         string
+                MaxDepth       int
+                AllowedDomains []string
+                FetcherType    string // "http" | "playwright"
+            }
+
+            // factory constructor
+            var f crawler.Fetcher
+            switch cfg.FetcherType {
+            case "playwright":
+                pwConfig := playwrightfetcher.DefaultConfig()
+                f = playwrightfetcher.NewPlaywrightFetcher(logger, pwConfig)
+            default:
+                f = fetcher.NewHTTPFetcher(httpClient)
+            }
+
+            err = c.Crawl(ctx, "https://example.com", f, p, storageSvc, defaultConcurrency)
+
     1. Parser Design 
         1. Parser needs to expect a model raw which has the domain website, use this to map the origin to the links for each job
         1. figure out what the model for extract_jobdata should look like and how to map it to joblisting if needed 
@@ -22,6 +49,11 @@ todo:
         1. make sure pipelines don't run LLM for testing
 
     2. Cralwer Design
+        2. Update Crawler main to accept CMD flags (use go flags similar to what was done in swagger) allow crawler config to be the options set 
+            - allow fetcher type to be set through cmd parameters
+            - think about how the playwright fetcher configuration can be read and parsed from a file
+                - from cmd flags 
+                - from predefined configurations for some sites.
         2. Update crawler to get more speicified data or design a data splitter / organiser to validate the data before feeding it to the LLM for job Parsing
 
             Use Ollama in docker and parse html with the api.
