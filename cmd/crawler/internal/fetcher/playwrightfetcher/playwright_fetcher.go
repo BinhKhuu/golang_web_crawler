@@ -83,9 +83,6 @@ func configurePlaywright(f *PlaywrightFetcher, logger *slog.Logger) (*Playwright
 
 
 */
-
-// Fetch implements the Fetcher interface using Playwright to fetch and render web pages, allowing for dynamic content extraction and interaction with JavaScript-heavy sites. It uses the provided configuration to determine how to navigate and extract data from the target website.
-// The fetch constructors determine which Fetch implementation will be used.
 func (f *PlaywrightFetcher) Fetch(ctx context.Context, url string) (crawler.FetchResult, error) {
 	return f.fetchFn(ctx, url)
 }
@@ -100,7 +97,7 @@ func (f *PlaywrightFetcher) FetchDefault(ctx context.Context, url string) (crawl
 			f.logger.Error("error closing page", "error", err)
 		}
 	}()
-	// 4. Add random delays and human-like behavior
+
 	const timeoutInMs = 30000
 	_, err = p.Goto(url, playwright.PageGotoOptions{
 		WaitUntil: playwright.WaitUntilStateNetworkidle,
@@ -159,26 +156,20 @@ func (f *PlaywrightFetcher) FetchSPAConfig(ctx context.Context, url string) (cra
 		return crawler.FetchResult{}, err
 	}
 
-	// stop at first successful search input selector
-	if len(f.fetchConfig.SearchInputSelectors) > 0 {
-		for _, sel := range f.fetchConfig.SearchInputSelectors {
-			err = p.Locator(sel).Fill(f.fetchConfig.SearchQuery)
-			if err == nil {
-				break
-			}
-		}
+	f.fillSearchInput(err, p)
+
+	f.submitSearch(err, p)
+
+	f.waitAndCollectResults(p, err)
+
+	if len(f.fetchConfig.SPAUpdateSelectors) > 0 {
+		// do SPA logic
 	}
 
-	// stop at first successful search submit selector
-	if len(f.fetchConfig.SearchSubmitSelectors) > 0 {
-		for _, btn := range f.fetchConfig.SearchSubmitSelectors {
-			err = p.Locator(btn).Click()
-			if err == nil {
-				break
-			}
-		}
-	}
+	return crawler.FetchResult{}, nil
+}
 
+func (f *PlaywrightFetcher) waitAndCollectResults(p playwright.Page, err error) {
 	if len(f.fetchConfig.ResultsSelectors) > 0 {
 		for _, sel := range f.fetchConfig.ResultsSelectors {
 			timeout := float64(f.fetchConfig.Timeout)
@@ -201,18 +192,34 @@ func (f *PlaywrightFetcher) FetchSPAConfig(ctx context.Context, url string) (cra
 						continue
 					}
 					// todo store results in crawler results
-					_ = fetchSPAConfigDataSelectors(f, p)
+					_ = f.fetchSPAConfigDataSelectors(p)
 				}
 			}
 			break
 		}
 	}
+}
 
-	if len(f.fetchConfig.SPAUpdateSelectors) > 0 {
-		// do SPA logic
+func (f *PlaywrightFetcher) submitSearch(err error, p playwright.Page) {
+	if len(f.fetchConfig.SearchSubmitSelectors) > 0 {
+		for _, btn := range f.fetchConfig.SearchSubmitSelectors {
+			err = p.Locator(btn).Click()
+			if err == nil {
+				break
+			}
+		}
 	}
+}
 
-	return crawler.FetchResult{}, nil
+func (f *PlaywrightFetcher) fillSearchInput(err error, p playwright.Page) {
+	if len(f.fetchConfig.SearchInputSelectors) > 0 {
+		for _, sel := range f.fetchConfig.SearchInputSelectors {
+			err = p.Locator(sel).Fill(f.fetchConfig.SearchQuery)
+			if err == nil {
+				break
+			}
+		}
+	}
 }
 
 func randomDelay() {
@@ -221,7 +228,7 @@ func randomDelay() {
 	time.Sleep(delay)
 }
 
-func fetchSPAConfigDataSelectors(f *PlaywrightFetcher, p playwright.Page) crawler.FetchResult {
+func (f *PlaywrightFetcher) fetchSPAConfigDataSelectors(p playwright.Page) crawler.FetchResult {
 	var texts []string
 	if len(f.fetchConfig.DataSelectors) > 0 {
 		for _, sel := range f.fetchConfig.DataSelectors {
@@ -237,9 +244,8 @@ func fetchSPAConfigDataSelectors(f *PlaywrightFetcher, p playwright.Page) crawle
 				}
 				f.logger.Info("playwright fetcher", "content", textContent)
 				texts = append(texts, textContent)
+				break
 			}
-
-			break
 		}
 	}
 	body := []byte(strings.Join(texts, "\n"))
