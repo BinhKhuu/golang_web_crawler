@@ -93,8 +93,8 @@ func (f *PlaywrightFetcher) FetchDefault(ctx context.Context, url string) (crawl
 		return crawler.FetchResult{}, err
 	}
 	defer func() {
-		if err := p.Close(); err != nil {
-			f.logger.Error("error closing page", "error", err)
+		if closeErr := p.Close(); err != nil {
+			f.logger.Error("error closing page", "error", closeErr)
 		}
 	}()
 
@@ -138,8 +138,8 @@ func (f *PlaywrightFetcher) FetchSPAConfig(ctx context.Context, url string) (cra
 		return crawler.FetchResult{}, err
 	}
 	defer func() {
-		if err := p.Close(); err != nil {
-			f.logger.Error("error closing page", "error", err)
+		if closeErr := p.Close(); err != nil {
+			f.logger.Error("error closing page", "error", closeErr)
 		}
 	}()
 
@@ -156,11 +156,9 @@ func (f *PlaywrightFetcher) FetchSPAConfig(ctx context.Context, url string) (cra
 		return crawler.FetchResult{}, err
 	}
 
-	f.fillSearchInput(err, p)
-
-	f.submitSearch(err, p)
-
-	f.waitAndCollectResults(p, err)
+	f.fillSearchInput(p)
+	f.submitSearch(p)
+	f.waitAndCollectResults(p)
 
 	if len(f.fetchConfig.SPAUpdateSelectors) > 0 {
 		// do SPA logic
@@ -169,12 +167,35 @@ func (f *PlaywrightFetcher) FetchSPAConfig(ctx context.Context, url string) (cra
 	return crawler.FetchResult{}, nil
 }
 
-func (f *PlaywrightFetcher) waitAndCollectResults(p playwright.Page, err error) {
+func randomDelay() {
+	//nolint:gosec // math/rand is intentional here, delay does not require cryptographic randomness
+	const randValue = 1000
+	const randRange = 2000
+	delay := time.Duration(randValue+rand.Intn(randRange)) * time.Millisecond
+	time.Sleep(delay)
+}
+
+// Close Call to prevent resource leaks. Should be deferred right after creating the fetcher instance.
+func (f *PlaywrightFetcher) Close() error {
+	if f.browser != nil {
+		if err := f.browser.Close(); err != nil {
+			return fmt.Errorf("%w: %w", ErrPlaywrightClose, err)
+		}
+	}
+	if f.pw != nil {
+		if err := f.pw.Stop(); err != nil {
+			return fmt.Errorf("%w: %w", ErrPlaywrightStop, err)
+		}
+	}
+	return nil
+}
+
+func (f *PlaywrightFetcher) waitAndCollectResults(p playwright.Page) {
 	if len(f.fetchConfig.ResultsSelectors) > 0 {
 		for _, sel := range f.fetchConfig.ResultsSelectors {
 			timeout := float64(f.fetchConfig.Timeout)
 			locator := p.Locator(sel)
-			err = locator.First().WaitFor(playwright.LocatorWaitForOptions{
+			err := locator.First().WaitFor(playwright.LocatorWaitForOptions{
 				State:   playwright.WaitForSelectorStateVisible,
 				Timeout: playwright.Float(timeout),
 			})
@@ -200,10 +221,10 @@ func (f *PlaywrightFetcher) waitAndCollectResults(p playwright.Page, err error) 
 	}
 }
 
-func (f *PlaywrightFetcher) submitSearch(err error, p playwright.Page) {
+func (f *PlaywrightFetcher) submitSearch(p playwright.Page) {
 	if len(f.fetchConfig.SearchSubmitSelectors) > 0 {
 		for _, btn := range f.fetchConfig.SearchSubmitSelectors {
-			err = p.Locator(btn).Click()
+			err := p.Locator(btn).Click()
 			if err == nil {
 				break
 			}
@@ -211,21 +232,15 @@ func (f *PlaywrightFetcher) submitSearch(err error, p playwright.Page) {
 	}
 }
 
-func (f *PlaywrightFetcher) fillSearchInput(err error, p playwright.Page) {
+func (f *PlaywrightFetcher) fillSearchInput(p playwright.Page) {
 	if len(f.fetchConfig.SearchInputSelectors) > 0 {
 		for _, sel := range f.fetchConfig.SearchInputSelectors {
-			err = p.Locator(sel).Fill(f.fetchConfig.SearchQuery)
+			err := p.Locator(sel).Fill(f.fetchConfig.SearchQuery)
 			if err == nil {
 				break
 			}
 		}
 	}
-}
-
-func randomDelay() {
-	// random delay between 1-3 seconds to mimic human behavior
-	delay := time.Duration(1000+rand.Intn(2000)) * time.Millisecond
-	time.Sleep(delay)
 }
 
 func (f *PlaywrightFetcher) fetchSPAConfigDataSelectors(p playwright.Page) crawler.FetchResult {
@@ -256,21 +271,6 @@ func (f *PlaywrightFetcher) fetchSPAConfigDataSelectors(p playwright.Page) crawl
 	}
 }
 
-// Close Call to prevent resource leaks. Should be deferred right after creating the fetcher instance.
-func (f *PlaywrightFetcher) Close() error {
-	if f.browser != nil {
-		if err := f.browser.Close(); err != nil {
-			return fmt.Errorf("%w: %w", ErrPlaywrightClose, err)
-		}
-	}
-	if f.pw != nil {
-		if err := f.pw.Stop(); err != nil {
-			return fmt.Errorf("%w: %w", ErrPlaywrightStop, err)
-		}
-	}
-	return nil
-}
-
 // configurePlaywrightBrowser sets up a Playwright browser instance with enhanced stealth options to better mimic human behavior and avoid detection by anti-bot measures.
 // will launch a browser in headed mode to prevent bot detection.
 func (f *PlaywrightFetcher) configurePlaywrightBrowser() error {
@@ -291,7 +291,9 @@ func (f *PlaywrightFetcher) configurePlaywrightBrowser() error {
 		},
 	})
 	if err != nil {
-		pw.Stop()
+		if pwErr := pw.Stop(); pwErr != nil {
+			f.logger.Error("error stopping Playwright after browser launch failure", "error", pwErr)
+		}
 		return err
 	}
 

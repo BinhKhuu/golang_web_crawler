@@ -21,7 +21,7 @@ func TestMain(m *testing.M) {
 }
 
 func getTestLLMData(t *testing.T) (string, []models.ExtractedJobData) {
-	content, err := os.ReadFile("./test/testcard.txt") // Todo move testoutoput.txt to a testdata folder
+	content, err := os.ReadFile("./test/ugh.txt") // Todo move testoutoput.txt to a testdata folder
 	if err != nil {
 		t.Fatalf("Failed to read test data: %v", err)
 	}
@@ -52,7 +52,7 @@ func Test_ParseJobDataLLM(t *testing.T) {
 
 	testData, expected := getTestLLMData(t)
 	// todo fix this prompt there is a + testData at the end its a copy of the query in the jobParser which also needs fixing
-	prompt := `/no_think Forget Previous prompt Extract the following fields in JSON format: 
+	prompt := `Extract the following fields in JSON format: 
 		- job_title
 		- company_name
 		- salary_range
@@ -61,7 +61,7 @@ func Test_ParseJobDataLLM(t *testing.T) {
 		- links (single string if multiple comma separated)(this is the job advertisement URL, not the company profile or search filter)
 		- required_skills (as an array)
 		
-		IF you cannot parse the input or find the job_title and links return this text 'I am an idiot'. DO NOT ATTEMPT TO RETURN ANYTHING ELSE, NOT EVEN AN EMPTY JSON ARRAY, JUST THIS TEXT.
+		IF you cannot parse the input or find the job_title return this text 'I am an idiot'. DO NOT ATTEMPT TO RETURN ANYTHING ELSE, NOT EVEN AN EMPTY JSON ARRAY, JUST THIS TEXT.
 		IF you do find job_title and links the returned result should be an array of JSON objects  mark the JSON with` + "```json```" +
 		`at the end of the JSON to make it easier to parse in the code
 		Text to process: ` + testData
@@ -71,6 +71,7 @@ func Test_ParseJobDataLLM(t *testing.T) {
 		t.Fatalf("LLM query failed: %v", err)
 	}
 
+	// when using ugh test file these will fail
 	if jobDetails[0].Title != expected[0].Title {
 		t.Errorf("Expected Title '%s', got '%s'", expected[0].Title, jobDetails[0].Title)
 	}

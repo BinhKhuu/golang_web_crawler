@@ -91,7 +91,7 @@ func (j *JobListingParser) ParseJobDataLLM(ctx context.Context, html string) ([]
 		return []models.ExtractedJobData{}, err
 	}
 
-	prompt := `/no_think Forget Previous prompt Extract the following fields in JSON format: 
+	prompt := `Extract the following fields in JSON format:
 		- job_title
 		- company_name
 		- salary_range
@@ -100,7 +100,7 @@ func (j *JobListingParser) ParseJobDataLLM(ctx context.Context, html string) ([]
 		- links (single string if multiple comma separated)(this is the job advertisement URL, not the company profile or search filter)
 		- required_skills (as an array)
 		
-		IF you cannot parse the input or find the job_title and links return this text 'I am an idiot'. DO NOT ATTEMPT TO RETURN ANYTHING ELSE, NOT EVEN AN EMPTY JSON ARRAY, JUST THIS TEXT.
+		IF you cannot parse the input or find the job_title return this text 'I am an idiot'. DO NOT ATTEMPT TO RETURN ANYTHING ELSE, NOT EVEN AN EMPTY JSON ARRAY, JUST THIS TEXT.
 		IF you do find job_title and links the returned result should be an array of JSON objects  mark the JSON with` + "```json```" +
 		`at the end of the JSON to make it easier to parse in the code
 		Text to process: ` + html
