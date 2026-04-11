@@ -16,7 +16,7 @@ func TestMain(m *testing.M) {
 	if err := godotenv.Load("../../.env"); err != nil {
 		log.Println("No .env file found, falling back to system env")
 	}
-	runLLMTest = os.Getenv("RUN_LLM_TESTS") == "0" || os.Getenv("RUN_LLM_TESTS") == ""
+	runLLMTest = os.Getenv("RUN_LLM_TESTS") == "1"
 	os.Exit(m.Run())
 }
 
@@ -41,7 +41,7 @@ func getExpectedLLMResults() []models.ExtractedJobData {
 }
 
 func Test_ParseJobDataLLM(t *testing.T) {
-	if runLLMTest {
+	if !runLLMTest {
 		t.Skip("Skipping: set RUN_LLM_TESTS=1 to run")
 	}
 
@@ -85,7 +85,7 @@ func Test_ParseJobDataLLM(t *testing.T) {
 }
 
 func Test_ParseJobDataLLM_ReturnEmptyJsonWhenNoMatch(t *testing.T) {
-	if runLLMTest {
+	if !runLLMTest {
 		t.Skip("Skipping: set RUN_LLM_TESTS=1 to run")
 	}
 
@@ -121,7 +121,7 @@ func Test_ParseJobDataLLM_ReturnEmptyJsonWhenNoMatch(t *testing.T) {
 }
 
 func Test_ParseJobDataLLM_AttemptsToFillInJsonObject(t *testing.T) {
-	if runLLMTest {
+	if !runLLMTest {
 		t.Skip("Skipping: set RUN_LLM_TESTS=1 to run")
 	}
 

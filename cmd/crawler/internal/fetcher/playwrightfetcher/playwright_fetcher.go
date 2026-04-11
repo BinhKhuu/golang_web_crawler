@@ -23,6 +23,7 @@ type PlaywrightFetcher struct {
 	pw          *playwright.Playwright
 	browser     playwright.Browser
 	browserCtx  playwright.BrowserContext
+	fetchFn     func(ctx context.Context, url string) (crawler.FetchResult, error)
 }
 
 /*
@@ -47,6 +48,22 @@ func NewPlaywrightFetcher(logger *slog.Logger, fetchConfig *PlaywrightFetcherCon
 		fetchConfig: fetchConfig,
 	}
 
+	f.fetchFn = f.FetchDefault
+
+	return configurePlaywright(f, logger)
+}
+
+func NewConfiguredPlaywrightFetcher(logger *slog.Logger, config PlaywrightFetcherConfig) (*PlaywrightFetcher, error) {
+	f := &PlaywrightFetcher{
+		logger:      logger,
+		fetchConfig: &config,
+	}
+	f.fetchFn = f.FetchConfig
+
+	return configurePlaywright(f, logger)
+}
+
+func configurePlaywright(f *PlaywrightFetcher, logger *slog.Logger) (*PlaywrightFetcher, error) {
 	err := f.configurePlaywrightBrowser()
 	if err != nil {
 		logger.Error("error configuring playwright browser", "error", err)
@@ -103,15 +120,23 @@ func NewPlaywrightFetcher(logger *slog.Logger, fetchConfig *PlaywrightFetcherCon
 
 
 */
-func (f *PlaywrightFetcher) Fetch(ctx context.Context, url string) (crawler.FetchResult, error) {
-	if f.fetchConfig == nil {
-		return crawler.FetchResult{}, nil
-	}
 
+// Fetch implements the Fetcher interface using Playwright to fetch and render web pages, allowing for dynamic content extraction and interaction with JavaScript-heavy sites. It uses the provided configuration to determine how to navigate and extract data from the target website.
+// The fetch constructors determine which Fetch implementation will be used.
+func (f *PlaywrightFetcher) Fetch(ctx context.Context, url string) (crawler.FetchResult, error) {
+	return f.fetchFn(ctx, url)
+}
+
+func (f *PlaywrightFetcher) FetchDefault(ctx context.Context, url string) (crawler.FetchResult, error) {
 	p, err := f.browserCtx.NewPage()
 	if err != nil {
 		return crawler.FetchResult{}, err
 	}
+	defer func() {
+		if err := p.Close(); err != nil {
+			f.logger.Error("error closing page", "error", err)
+		}
+	}()
 	// 4. Add random delays and human-like behavior
 	const timeoutInMs = 30000
 	_, err = p.Goto(url, playwright.PageGotoOptions{
@@ -143,6 +168,21 @@ func (f *PlaywrightFetcher) Fetch(ctx context.Context, url string) (crawler.Fetc
 		}
 		f.logger.Info("playwright fetcher", "url", url, "content", text)
 	}
+
+	return crawler.FetchResult{}, nil
+}
+
+// url string is ignored
+func (f *PlaywrightFetcher) FetchConfig(ctx context.Context, url string) (crawler.FetchResult, error) {
+	p, err := f.browserCtx.NewPage()
+	if err != nil {
+		return crawler.FetchResult{}, err
+	}
+	defer func() {
+		if err := p.Close(); err != nil {
+			f.logger.Error("error closing page", "error", err)
+		}
+	}()
 
 	return crawler.FetchResult{}, nil
 }
@@ -182,6 +222,7 @@ func (f *PlaywrightFetcher) configurePlaywrightBrowser() error {
 		},
 	})
 	if err != nil {
+		pw.Stop()
 		return err
 	}
 
@@ -201,6 +242,7 @@ func (f *PlaywrightFetcher) configurePlaywrightBrowser() error {
 	// 2. More comprehensive script injection
 	bctx, err := b.NewContext(ops)
 	if err != nil {
+		b.Close()
 		return err
 	}
 
@@ -231,6 +273,7 @@ func (f *PlaywrightFetcher) configurePlaywrightBrowser() error {
         `),
 	})
 	if err != nil {
+		bctx.Close()
 		return err
 	}
 
