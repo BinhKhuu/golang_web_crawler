@@ -1,20 +1,8 @@
 todo: 
 
-    1. Playwright fetcher 
-        - add playwright configuration
-            - use confiuration to look for elements and fetch data
-                
-        - Investigate how to use playwright in go
-        - Investigate how to navigate and do simple clicks (use seek)
-            - navigate through job links 
-            - try to make it robust
+    1. Playwright fetcher  
         - Investigate how to return network data 
-        - compare with ai agent 
-            ask it to use playwright
-                avoid bot detection
-                look for job id link 
-        - add notes on play wright bot detection 
-        - investigate if s logger is needed in the new params
+        - add notes on play wright bot detection as readme
         - do i need to test playwright configuratior ? 
             don't think so since its play wright implementation
 

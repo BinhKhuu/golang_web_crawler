@@ -2,14 +2,30 @@ package playwrightfetcher
 
 import (
 	"context"
+	"log"
 	"log/slog"
 	"os"
 	"testing"
 	"unicode/utf8"
+
+	"github.com/joho/godotenv"
 )
+
+var runFetchTest = false
+
+func TestMain(m *testing.M) {
+	if err := godotenv.Load("../../../../../.env"); err != nil {
+		log.Println("No .env file found, falling back to system env")
+	}
+	runFetchTest = os.Getenv("RUN_FETCH_TESTS") == "0" || os.Getenv("RUN_FETCH_TESTS") == ""
+	os.Exit(m.Run())
+}
 
 // todo prevent this from running in pipeline because playwright runs in headed mode for anti bot detection.
 func Test_Fetch(t *testing.T) {
+	if runFetchTest {
+		t.Skip("Skipping: set RUN_LLM_TESTS=1 to run")
+	}
 	url := "https://www.seek.com.au/software-engineer-jobs"
 	ctx := context.Background()
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{

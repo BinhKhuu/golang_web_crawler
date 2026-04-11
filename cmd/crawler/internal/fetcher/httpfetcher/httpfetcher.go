@@ -1,4 +1,4 @@
-package fetcher
+package httpfetcher
 
 import (
 	"context"

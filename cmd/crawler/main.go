@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"golangwebcrawler/cmd/crawler/internal/crawler"
-	"golangwebcrawler/cmd/crawler/internal/fetcher"
+	"golangwebcrawler/cmd/crawler/internal/fetcher/httpfetcher"
 	"golangwebcrawler/cmd/crawler/internal/parser"
 	"golangwebcrawler/internal/dbstore"
 	"golangwebcrawler/internal/storage"
@@ -61,7 +61,7 @@ func main() {
 	c := crawler.NewCrawler(cfg.MaxDepth, cfg.AllowedDomains, logger)
 	storageSvc := storage.NewService(database, logger)
 	p := parser.NewHTTPParser()
-	f := fetcher.NewHTTPFetcher(httpClient)
+	f := httpfetcher.NewHTTPFetcher(httpClient)
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
