@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"golangwebcrawler/cmd/crawler/internal/crawler"
 	"log/slog"
+	"math/rand"
+	"strings"
+	"time"
 
 	"github.com/playwright-community/playwright-go"
 )
@@ -53,12 +56,12 @@ func NewPlaywrightFetcher(logger *slog.Logger, fetchConfig *PlaywrightFetcherCon
 	return configurePlaywright(f, logger)
 }
 
-func NewConfiguredPlaywrightFetcher(logger *slog.Logger, config PlaywrightFetcherConfig) (*PlaywrightFetcher, error) {
+func NewConfiguredPlaywrightFetcher(logger *slog.Logger, config *PlaywrightFetcherConfig) (*PlaywrightFetcher, error) {
 	f := &PlaywrightFetcher{
 		logger:      logger,
-		fetchConfig: &config,
+		fetchConfig: config,
 	}
-	f.fetchFn = f.FetchConfig
+	f.fetchFn = f.FetchSPAConfig
 
 	return configurePlaywright(f, logger)
 }
@@ -74,49 +77,9 @@ func configurePlaywright(f *PlaywrightFetcher, logger *slog.Logger) (*Playwright
 
 // todo add channel and defer ctx close logic.
 /*
-	1. Introduce a playwright configuration (and default configuration)
-		- inside configuration have selectors, searchquery, search submit selectors etc
-		- all the information needed for a configuration to target a specific website
-		- the fetcher will be generic and look for these selectors and store the information if it can
-		- might need a SPA configuration or SPA function thats separate from the regular page refresher
-			- spa will have better luck looking at network traffic to get the data
-	GUARD against nil configuration
-
-		if f.fetchConfig == nil {
-			return crawler.FetchResult{}, errors.New("fetch config is nil")
-		}
-
-		// slices - check before ranging or indexing
-		if len(f.fetchConfig.SearchInputSelectors) > 0 {
-			// do search input logic
-		}
-
-		if len(f.fetchConfig.SearchSubmitSelectors) > 0 {
-			// do search submit logic
-		}
-
-		if len(f.fetchConfig.ResultsSelectors) > 0 {
-			// do results logic
-		}
-
-		if len(f.fetchConfig.DataSelectors) > 0 {
-			// do data extraction logic
-		}
-
-		if len(f.fetchConfig.SPAUpdateSelectors) > 0 {
-			// do SPA logic
-		}
-	2. Add random delays and human-like behavior
-	3. the Fetch via playwright will be generice
-		1. Load page
-		2. Wait for dom to load and first selector to be available
-		3. Add cookies and email and promoto click acceptors
-		3. If Searching then run search confiruation
-		4. If Clicking run clicking configuration
-			- click selector
-			- look for details
-				- check html and network
-				- if details store
+	1. Playwright Fetcher can return multiple crawler results. Need to design now Crawler can handle an array of returned items
+		- might be best to change the return type to slice of FetchResults this can allow for 0 - many results
+	2. Look into inspecing the network for data
 
 
 */
@@ -172,8 +135,7 @@ func (f *PlaywrightFetcher) FetchDefault(ctx context.Context, url string) (crawl
 	return crawler.FetchResult{}, nil
 }
 
-// url string is ignored
-func (f *PlaywrightFetcher) FetchConfig(ctx context.Context, url string) (crawler.FetchResult, error) {
+func (f *PlaywrightFetcher) FetchSPAConfig(ctx context.Context, url string) (crawler.FetchResult, error) {
 	p, err := f.browserCtx.NewPage()
 	if err != nil {
 		return crawler.FetchResult{}, err
@@ -184,7 +146,108 @@ func (f *PlaywrightFetcher) FetchConfig(ctx context.Context, url string) (crawle
 		}
 	}()
 
+	if f.fetchConfig == nil {
+		return crawler.FetchResult{}, errors.New("fetch config is nil")
+	}
+
+	const timeoutInMs = 30000
+	_, err = p.Goto(url, playwright.PageGotoOptions{
+		WaitUntil: playwright.WaitUntilStateNetworkidle,
+		Timeout:   playwright.Float(timeoutInMs),
+	})
+	if err != nil {
+		return crawler.FetchResult{}, err
+	}
+
+	// stop at first successful search input selector
+	if len(f.fetchConfig.SearchInputSelectors) > 0 {
+		for _, sel := range f.fetchConfig.SearchInputSelectors {
+			err = p.Locator(sel).Fill(f.fetchConfig.SearchQuery)
+			if err == nil {
+				break
+			}
+		}
+	}
+
+	// stop at first successful search submit selector
+	if len(f.fetchConfig.SearchSubmitSelectors) > 0 {
+		for _, btn := range f.fetchConfig.SearchSubmitSelectors {
+			err = p.Locator(btn).Click()
+			if err == nil {
+				break
+			}
+		}
+	}
+
+	if len(f.fetchConfig.ResultsSelectors) > 0 {
+		for _, sel := range f.fetchConfig.ResultsSelectors {
+			timeout := float64(f.fetchConfig.Timeout)
+			locator := p.Locator(sel)
+			err = locator.First().WaitFor(playwright.LocatorWaitForOptions{
+				State:   playwright.WaitForSelectorStateVisible,
+				Timeout: playwright.Float(timeout),
+			})
+			if err != nil {
+				continue
+			}
+
+			entries, err := p.Locator(sel).All()
+			if err == nil {
+				for _, entry := range entries {
+					err := entry.Click()
+					randomDelay()
+					if err != nil {
+						f.logger.Error("error clicking entry", "error", err)
+						continue
+					}
+					// todo store results in crawler results
+					_ = fetchSPAConfigDataSelectors(f, p)
+				}
+			}
+			break
+		}
+	}
+
+	if len(f.fetchConfig.SPAUpdateSelectors) > 0 {
+		// do SPA logic
+	}
+
 	return crawler.FetchResult{}, nil
+}
+
+func randomDelay() {
+	// random delay between 1-3 seconds to mimic human behavior
+	delay := time.Duration(1000+rand.Intn(2000)) * time.Millisecond
+	time.Sleep(delay)
+}
+
+func fetchSPAConfigDataSelectors(f *PlaywrightFetcher, p playwright.Page) crawler.FetchResult {
+	var texts []string
+	if len(f.fetchConfig.DataSelectors) > 0 {
+		for _, sel := range f.fetchConfig.DataSelectors {
+			entries, err := p.Locator(sel).All()
+			if err != nil {
+				continue
+			}
+
+			for _, entry := range entries {
+				textContent, err := entry.TextContent()
+				if err != nil {
+					textContent = "error getting text content"
+				}
+				f.logger.Info("playwright fetcher", "content", textContent)
+				texts = append(texts, textContent)
+			}
+
+			break
+		}
+	}
+	body := []byte(strings.Join(texts, "\n"))
+	return crawler.FetchResult{
+		URL:        p.URL(), // todo URL should be the URL of the job details page, not the search results page. need to click into the job details and extract from there.
+		Body:       body,    // todo extract body content
+		StatusCode: 200,     // todo extract status code
+	}
 }
 
 // Close Call to prevent resource leaks. Should be deferred right after creating the fetcher instance.

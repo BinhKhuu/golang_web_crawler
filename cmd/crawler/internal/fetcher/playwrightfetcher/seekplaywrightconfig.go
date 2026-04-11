@@ -3,7 +3,7 @@ package playwrightfetcher
 func GetSeekConfiguration() PlaywrightFetcherConfig {
 	defaultTimeout := 10000
 	return PlaywrightFetcherConfig{
-		URL:      "https://www.seek.com.au",
+		URL:      "https://www.seek.com.au/software-engineer-jobs",
 		Headless: true,
 		SearchInputSelectors: []string{
 			"input[name=keywords]",
@@ -20,17 +20,13 @@ func GetSeekConfiguration() PlaywrightFetcherConfig {
 			"a[data-testid='job-result']",
 		},
 		DataSelectors: []string{
-			"a[id*='job-title']",
-			"a[data-automation='jobTitle']",
-			".job-title a",
-			"article a[href*='/job/']",
-		},
-		SPAUpdateSelectors: []string{
 			"#job-details",
 			".JobDetail",
 			"[data-automation='jobDetail']",
+			"[data-automation='jobDetailsPage']",
 			".job-detail-content",
 		},
-		Timeout: defaultTimeout,
+		SPAUpdateSelectors: []string{},
+		Timeout:            defaultTimeout,
 	}
 }

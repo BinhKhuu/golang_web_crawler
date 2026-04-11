@@ -21,8 +21,30 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
+func Test_FetchSPAConfig(t *testing.T) {
+	if !runFetchTest {
+		t.Skip("Skipping: set RUN_LLM_TESTS=1 to run")
+	}
+
+	ctx := context.Background()
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	}))
+	config := GetSeekConfiguration()
+	fetcher, err := NewConfiguredPlaywrightFetcher(logger, &config)
+	if err != nil {
+		fetcher.Close()
+		t.Fatalf("creating playwright fetcher: %v", err)
+	}
+	_, err = fetcher.Fetch(ctx, config.URL)
+	if err != nil {
+		fetcher.Close()
+		t.Fatalf("fetching url %s: %v", config.URL, err)
+	}
+}
+
 // todo prevent this from running in pipeline because playwright runs in headed mode for anti bot detection.
-func Test_Fetch(t *testing.T) {
+func Test_FetchDefault(t *testing.T) {
 	if !runFetchTest {
 		t.Skip("Skipping: set RUN_LLM_TESTS=1 to run")
 	}
