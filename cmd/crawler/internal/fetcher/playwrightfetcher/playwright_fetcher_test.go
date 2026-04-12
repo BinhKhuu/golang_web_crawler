@@ -147,38 +147,123 @@ func createMockFetcher() *PlaywrightFetcher {
 	return f
 }
 
-func Test_WaitAndCollectResults_ShouldReturnSlice(t *testing.T) {
+func Test_WaitAndCollectResults_AndfetchSPAConfigDataSelectors(t *testing.T) {
 	if !runFetchTest {
 		t.Skip("Skipping: set RUN_FETCH_TESTS=1 to run")
 	}
 
-	// serve local html with known structure
+	tc := []struct {
+		name                string
+		html                string
+		resultsSelectors    []string
+		dataSelectors       []string
+		expectedResultCount int
+	}{
+		{
+			name: "should use fallback selector when first selector fails",
+			html: `
+				<html>
+				<body>
+					<a class="job-link" href="/job/1">Software Engineer</a>
+					<div id="job-details">Job details content</div>
+				</body>
+				</html>`,
+			resultsSelectors: []string{
+				"a[data-automation='jobTitle']",
+				"a.job-link",
+			},
+			dataSelectors: []string{
+				"a[data-automation='jobDetailsPage']",
+				"#job-details",
+			},
+			expectedResultCount: 1,
+		},
+		{
+			name: "should return empty when ResultsSelectors is empty",
+			html: `
+				<html>
+					<body>
+						<a data-automation="jobTitle" href="/job/1">Software Engineer</a>
+						<div id="job-details">Job details content</div>
+					</body>
+				</html>`,
+			resultsSelectors:    []string{},
+			dataSelectors:       []string{},
+			expectedResultCount: 0,
+		},
+		{
+			name: "should return empty when DataSelectors dont match page content",
+			html: `
+			<html>
+				<body>
+					<a data-automation="jobTitle" href="/job/1">Software Engineer</a>
+					<div id="job-details">Job details content</div>
+				</body>
+			</html>`,
+			resultsSelectors:    []string{"a[data-automation='jobTitle']"},
+			dataSelectors:       []string{"a.no-match"},
+			expectedResultCount: 0,
+		},
+		{
+			name: "should handle multiple entries under one selector",
+			html: `<html><body>
+				<a data-automation="jobTitle" href="/job/1">Job 1</a>
+				<a data-automation="jobTitle" href="/job/2">Job 2</a>
+				<a data-automation="jobTitle" href="/job/3">Job 3</a>
+				<div data-automation="jobDetailsPage">Job details content</div>
+				</body></html>
+				<div data-automation="jobDetailsPage2">Job details content2</div>
+				</body></html>
+				<div data-automation="jobDetailsPage3">Job details content3</div>
+				</body></html>`,
+			resultsSelectors: []string{"a[data-automation='jobTitle']"},
+			dataSelectors: []string{
+				"div[data-automation='jobDetailsPage']",
+				"div[data-automation='jobDetailsPage2']",
+				"div[data-automation='jobDetailsPage3']",
+			},
+			expectedResultCount: 3,
+		},
+	}
+	for _, tt := range tc {
+		t.Run(tt.name, func(t *testing.T) {
+			ts := createTestHttpServer(tt.html)
+
+			f := createMockFetcher()
+			f.fetchConfig.ResultsSelectors = tt.resultsSelectors
+			f.fetchConfig.DataSelectors = tt.dataSelectors
+			f.fetchConfig.Timeout = defaultTimeout
+
+			err := f.configurePlaywrightBrowser()
+			if err != nil {
+				t.Fatalf("configurePlaywrightBrowser() error = %v", err)
+			}
+			defer f.Close()
+
+			p, _ := f.browserCtx.NewPage()
+			pOpts := playwright.PageGotoOptions{}
+			defer func() {
+				closeErr := p.Close()
+				if closeErr != nil {
+					t.Logf("error closing page: %v", closeErr)
+				}
+			}()
+			_, err = p.Goto(ts.URL, pOpts)
+			if err != nil {
+				t.Fatalf("page.Goto() error = %v", err)
+			}
+
+			results := f.waitAndCollectResults(p)
+			if len(results) != tt.expectedResultCount {
+				t.Errorf("error expected to return %d results, got %d", tt.expectedResultCount, len(results))
+			}
+		})
+	}
+}
+
+func createTestHttpServer(html string) *httptest.Server {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, `<html><body>
-            <a data-automation="jobTitle" href="/job/1">Software Engineer</a>
-            <a data-automation="jobTitle" href="/job/2">Go Developer</a>
-        </body></html>`)
+		fmt.Fprint(w, html)
 	}))
-	defer ts.Close()
-
-	f := createMockFetcher()
-	f.fetchConfig.ResultsSelectors = []string{"a[data-automation='jobTitle']"}
-	f.fetchConfig.DataSelectors = []string{"a[data-automation='jobTitle']"}
-	f.fetchConfig.Timeout = defaultTimeout
-
-	err := f.configurePlaywrightBrowser()
-	if err != nil {
-		t.Fatalf("configurePlaywrightBrowser() error = %v", err)
-	}
-	defer f.Close()
-
-	p, _ := f.browserCtx.NewPage()
-	pOpts := playwright.PageGotoOptions{}
-	defer p.Close()
-	p.Goto(ts.URL, pOpts)
-
-	results := f.waitAndCollectResults(p)
-	if len(results) == 0 {
-		t.Error("expected results, got empty slice")
-	}
+	return ts
 }

@@ -183,6 +183,7 @@ func (f *PlaywrightFetcher) Close() error {
 	return nil
 }
 
+// waitAndCollectResults stops on first matching selector.
 func (f *PlaywrightFetcher) waitAndCollectResults(p playwright.Page) []crawler.FetchResult {
 	var results []crawler.FetchResult
 	if len(f.fetchConfig.ResultsSelectors) > 0 {
@@ -216,6 +217,7 @@ func (f *PlaywrightFetcher) waitAndCollectResults(p playwright.Page) []crawler.F
 	return results
 }
 
+// submitSearch stops on the first matching selector
 func (f *PlaywrightFetcher) submitSearch(p playwright.Page) {
 	if len(f.fetchConfig.SearchSubmitSelectors) > 0 {
 		for _, btn := range f.fetchConfig.SearchSubmitSelectors {
@@ -227,6 +229,7 @@ func (f *PlaywrightFetcher) submitSearch(p playwright.Page) {
 	}
 }
 
+// fillSearchInput stops on the first matching selector
 func (f *PlaywrightFetcher) fillSearchInput(p playwright.Page) {
 	if len(f.fetchConfig.SearchInputSelectors) > 0 {
 		for _, sel := range f.fetchConfig.SearchInputSelectors {
@@ -238,6 +241,8 @@ func (f *PlaywrightFetcher) fillSearchInput(p playwright.Page) {
 	}
 }
 
+// fetchSPAConfigDataSelectors iterates through the provided data selectors in the fetch configuration,
+// attempting to locate and extract text content from elements matching those selectors on the current page.
 func (f *PlaywrightFetcher) fetchSPAConfigDataSelectors(p playwright.Page) []crawler.FetchResult {
 	var results []crawler.FetchResult
 	if len(f.fetchConfig.DataSelectors) > 0 {
@@ -258,7 +263,6 @@ func (f *PlaywrightFetcher) fetchSPAConfigDataSelectors(p playwright.Page) []cra
 					Body:       []byte(textContent),
 					StatusCode: http.StatusOK, // todo get status code if possible
 				})
-				break
 			}
 		}
 	}
