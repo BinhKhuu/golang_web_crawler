@@ -7,15 +7,15 @@ import (
 	"golangwebcrawler/cmd/crawler/internal/crawler"
 	"log/slog"
 	"math/rand"
-	"strings"
+	"net/http"
 	"time"
 
 	"github.com/playwright-community/playwright-go"
 )
 
 var (
-	ErrPlaywrightClose = errors.New("closing playwright browser")
-	ErrPlaywrightStop  = errors.New("stopping playwright")
+	ErrPlaywrightClose = errors.New("closing playwright browser error")
+	ErrPlaywrightStop  = errors.New("stopping playwright error")
 )
 
 const defaultTimeout = 10000
@@ -41,7 +41,6 @@ type PlaywrightFetcherConfig struct {
 	SearchSubmitSelectors []string `json:"searchSubmitSelectors"`
 	ResultsSelectors      []string `json:"resultsSelectors"`
 	DataSelectors         []string `json:"dataSelectors"`
-	SPAUpdateSelectors    []string `json:"spaUpdateSelectors"`
 	Timeout               int      `json:"timeout"`
 }
 
@@ -50,9 +49,7 @@ func NewPlaywrightFetcher(logger *slog.Logger, fetchConfig *PlaywrightFetcherCon
 		logger:      logger,
 		fetchConfig: fetchConfig,
 	}
-
 	f.fetchFn = f.FetchDefault
-
 	return configurePlaywright(f, logger)
 }
 
@@ -62,7 +59,6 @@ func NewConfiguredPlaywrightFetcher(logger *slog.Logger, config *PlaywrightFetch
 		fetchConfig: config,
 	}
 	f.fetchFn = f.FetchSPAConfig
-
 	return configurePlaywright(f, logger)
 }
 
@@ -80,8 +76,6 @@ func configurePlaywright(f *PlaywrightFetcher, logger *slog.Logger) (*Playwright
 	1. Playwright Fetcher can return multiple crawler results. Need to design now Crawler can handle an array of returned items
 		- might be best to change the return type to slice of FetchResults this can allow for 0 - many results
 	2. Look into inspecing the network for data
-
-
 */
 func (f *PlaywrightFetcher) Fetch(ctx context.Context, url string) ([]crawler.FetchResult, error) {
 	return f.fetchFn(ctx, url)
@@ -108,7 +102,6 @@ func (f *PlaywrightFetcher) FetchDefault(ctx context.Context, url string) ([]cra
 	}
 
 	locator := p.Locator("a[id*='job-title']")
-
 	err = locator.WaitFor(playwright.LocatorWaitForOptions{
 		State: playwright.WaitForSelectorStateVisible,
 	})
@@ -158,19 +151,14 @@ func (f *PlaywrightFetcher) FetchSPAConfig(ctx context.Context, url string) ([]c
 
 	f.fillSearchInput(p)
 	f.submitSearch(p)
-	f.waitAndCollectResults(p)
-
-	if len(f.fetchConfig.SPAUpdateSelectors) > 0 {
-		// do SPA logic
-	}
-
-	return []crawler.FetchResult{}, nil
+	results := f.waitAndCollectResults(p)
+	return results, nil
 }
 
 func randomDelay() {
-	//nolint:gosec // math/rand is intentional here, delay does not require cryptographic randomness
 	const randValue = 1000
 	const randRange = 2000
+	// #nosec G404 - math/rand is sufficient for network jitter
 	delay := time.Duration(randValue+rand.Intn(randRange)) * time.Millisecond
 	time.Sleep(delay)
 }
@@ -190,7 +178,8 @@ func (f *PlaywrightFetcher) Close() error {
 	return nil
 }
 
-func (f *PlaywrightFetcher) waitAndCollectResults(p playwright.Page) {
+func (f *PlaywrightFetcher) waitAndCollectResults(p playwright.Page) []crawler.FetchResult {
+	var results []crawler.FetchResult
 	if len(f.fetchConfig.ResultsSelectors) > 0 {
 		for _, sel := range f.fetchConfig.ResultsSelectors {
 			timeout := float64(f.fetchConfig.Timeout)
@@ -213,12 +202,13 @@ func (f *PlaywrightFetcher) waitAndCollectResults(p playwright.Page) {
 						continue
 					}
 					// todo store results in crawler results
-					_ = f.fetchSPAConfigDataSelectors(p)
+					results = f.fetchSPAConfigDataSelectors(p)
 				}
 			}
 			break
 		}
 	}
+	return results
 }
 
 func (f *PlaywrightFetcher) submitSearch(p playwright.Page) {
@@ -243,8 +233,8 @@ func (f *PlaywrightFetcher) fillSearchInput(p playwright.Page) {
 	}
 }
 
-func (f *PlaywrightFetcher) fetchSPAConfigDataSelectors(p playwright.Page) crawler.FetchResult {
-	var texts []string
+func (f *PlaywrightFetcher) fetchSPAConfigDataSelectors(p playwright.Page) []crawler.FetchResult {
+	var results []crawler.FetchResult
 	if len(f.fetchConfig.DataSelectors) > 0 {
 		for _, sel := range f.fetchConfig.DataSelectors {
 			entries, err := p.Locator(sel).All()
@@ -258,17 +248,17 @@ func (f *PlaywrightFetcher) fetchSPAConfigDataSelectors(p playwright.Page) crawl
 					textContent = "error getting text content"
 				}
 				f.logger.Info("playwright fetcher", "content", textContent)
-				texts = append(texts, textContent)
+				results = append(results, crawler.FetchResult{
+					URL:        p.URL(), // todo get url if possible
+					Body:       []byte(textContent),
+					StatusCode: http.StatusOK, // todo get status code if possible
+				})
 				break
 			}
 		}
 	}
-	body := []byte(strings.Join(texts, "\n"))
-	return crawler.FetchResult{
-		URL:        p.URL(), // todo URL should be the URL of the job details page, not the search results page. need to click into the job details and extract from there.
-		Body:       body,    // todo extract body content
-		StatusCode: 200,     // todo extract status code
-	}
+
+	return results
 }
 
 // configurePlaywrightBrowser sets up a Playwright browser instance with enhanced stealth options to better mimic human behavior and avoid detection by anti-bot measures.
@@ -377,12 +367,6 @@ func DefaultConfig() PlaywrightFetcherConfig {
 			"a[data-automation='jobTitle']",
 			".job-title a",
 			"article a[href*='/job/']",
-		},
-		SPAUpdateSelectors: []string{
-			"#job-details",
-			".JobDetail",
-			"[data-automation='jobDetail']",
-			".job-detail-content",
 		},
 		Timeout: defaultTimeout,
 	}

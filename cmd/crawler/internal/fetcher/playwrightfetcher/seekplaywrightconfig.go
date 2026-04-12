@@ -26,7 +26,6 @@ func GetSeekConfiguration() PlaywrightFetcherConfig {
 			"[data-automation='jobDetailsPage']",
 			".job-detail-content",
 		},
-		SPAUpdateSelectors: []string{},
-		Timeout:            defaultTimeout,
+		Timeout: defaultTimeout,
 	}
 }

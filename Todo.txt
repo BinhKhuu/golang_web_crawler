@@ -1,10 +1,6 @@
 todo: 
 
     1. Playwright fetcher  
-        - Update Crawler interface to return a slice of crawler.results
-            - playwright parser can return multiple results for the one URL because a SPA application doesn't refresh
-            - handling a slice of crawler.fetchresults allows the code to handle 0 - many making it more dynamic
-            - Affected will be crawler, all fetchers 
         - Investigate how to return network data 
         - add notes on play wright bot detection as readme
         - do i need to test playwright configuratior ? 
