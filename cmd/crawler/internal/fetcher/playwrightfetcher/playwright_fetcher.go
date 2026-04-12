@@ -165,6 +165,11 @@ func randomDelay() {
 
 // Close Call to prevent resource leaks. Should be deferred right after creating the fetcher instance.
 func (f *PlaywrightFetcher) Close() error {
+	if f.browserCtx != nil {
+		if ctxErr := f.browserCtx.Close(); ctxErr != nil {
+			return fmt.Errorf("%w: %w", ErrPlaywrightClose, ctxErr)
+		}
+	}
 	if f.browser != nil {
 		if err := f.browser.Close(); err != nil {
 			return fmt.Errorf("%w: %w", ErrPlaywrightClose, err)
