@@ -29,12 +29,12 @@ type MockFetcher struct {
 	Err        error
 }
 
-func (m *MockFetcher) Fetch(ctx context.Context, url string) (FetchResult, error) {
-	return FetchResult{
+func (m *MockFetcher) Fetch(ctx context.Context, url string) ([]FetchResult, error) {
+	return []FetchResult{{
 		URL:        m.URL,
 		StatusCode: m.StatusCode,
 		Body:       m.Body,
-	}, m.Err
+	}}, m.Err
 }
 
 type MockParser struct {

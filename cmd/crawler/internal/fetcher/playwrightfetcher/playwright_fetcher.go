@@ -26,7 +26,7 @@ type PlaywrightFetcher struct {
 	pw          *playwright.Playwright
 	browser     playwright.Browser
 	browserCtx  playwright.BrowserContext
-	fetchFn     func(ctx context.Context, url string) (crawler.FetchResult, error)
+	fetchFn     func(ctx context.Context, url string) ([]crawler.FetchResult, error)
 }
 
 /*
@@ -83,14 +83,14 @@ func configurePlaywright(f *PlaywrightFetcher, logger *slog.Logger) (*Playwright
 
 
 */
-func (f *PlaywrightFetcher) Fetch(ctx context.Context, url string) (crawler.FetchResult, error) {
+func (f *PlaywrightFetcher) Fetch(ctx context.Context, url string) ([]crawler.FetchResult, error) {
 	return f.fetchFn(ctx, url)
 }
 
-func (f *PlaywrightFetcher) FetchDefault(ctx context.Context, url string) (crawler.FetchResult, error) {
+func (f *PlaywrightFetcher) FetchDefault(ctx context.Context, url string) ([]crawler.FetchResult, error) {
 	p, err := f.browserCtx.NewPage()
 	if err != nil {
-		return crawler.FetchResult{}, err
+		return []crawler.FetchResult{}, err
 	}
 	defer func() {
 		if closeErr := p.Close(); err != nil {
@@ -104,7 +104,7 @@ func (f *PlaywrightFetcher) FetchDefault(ctx context.Context, url string) (crawl
 		Timeout:   playwright.Float(timeoutInMs),
 	})
 	if err != nil {
-		return crawler.FetchResult{}, err
+		return []crawler.FetchResult{}, err
 	}
 
 	locator := p.Locator("a[id*='job-title']")
@@ -113,12 +113,12 @@ func (f *PlaywrightFetcher) FetchDefault(ctx context.Context, url string) (crawl
 		State: playwright.WaitForSelectorStateVisible,
 	})
 	if err != nil {
-		return crawler.FetchResult{}, err
+		return []crawler.FetchResult{}, err
 	}
 
 	entries, err := p.Locator(`a[id*='job-title']`).All()
 	if err != nil {
-		return crawler.FetchResult{}, err
+		return []crawler.FetchResult{}, err
 	}
 
 	for _, entry := range entries {
@@ -129,13 +129,13 @@ func (f *PlaywrightFetcher) FetchDefault(ctx context.Context, url string) (crawl
 		f.logger.Info("playwright fetcher", "url", url, "content", text)
 	}
 
-	return crawler.FetchResult{}, nil
+	return []crawler.FetchResult{}, nil
 }
 
-func (f *PlaywrightFetcher) FetchSPAConfig(ctx context.Context, url string) (crawler.FetchResult, error) {
+func (f *PlaywrightFetcher) FetchSPAConfig(ctx context.Context, url string) ([]crawler.FetchResult, error) {
 	p, err := f.browserCtx.NewPage()
 	if err != nil {
-		return crawler.FetchResult{}, err
+		return []crawler.FetchResult{}, err
 	}
 	defer func() {
 		if closeErr := p.Close(); err != nil {
@@ -144,7 +144,7 @@ func (f *PlaywrightFetcher) FetchSPAConfig(ctx context.Context, url string) (cra
 	}()
 
 	if f.fetchConfig == nil {
-		return crawler.FetchResult{}, errors.New("fetch config is nil")
+		return []crawler.FetchResult{}, errors.New("fetch config is nil")
 	}
 
 	const timeoutInMs = 30000
@@ -153,7 +153,7 @@ func (f *PlaywrightFetcher) FetchSPAConfig(ctx context.Context, url string) (cra
 		Timeout:   playwright.Float(timeoutInMs),
 	})
 	if err != nil {
-		return crawler.FetchResult{}, err
+		return []crawler.FetchResult{}, err
 	}
 
 	f.fillSearchInput(p)
@@ -164,7 +164,7 @@ func (f *PlaywrightFetcher) FetchSPAConfig(ctx context.Context, url string) (cra
 		// do SPA logic
 	}
 
-	return crawler.FetchResult{}, nil
+	return []crawler.FetchResult{}, nil
 }
 
 func randomDelay() {

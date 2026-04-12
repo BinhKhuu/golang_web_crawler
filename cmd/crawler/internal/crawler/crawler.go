@@ -11,7 +11,7 @@ import (
 )
 
 type Fetcher interface {
-	Fetch(ctx context.Context, url string) (FetchResult, error)
+	Fetch(ctx context.Context, url string) ([]FetchResult, error)
 }
 
 type FetchResult struct {
@@ -181,28 +181,32 @@ func (c *Crawler) processURL(ctx context.Context, job crawlJob, fetch Fetcher, p
 	default:
 	}
 
-	fetchResult, err := fetch.Fetch(ctx, job.url)
+	fetchResults, err := fetch.Fetch(ctx, job.url)
 	if err != nil {
 		return nil, fmt.Errorf("fetching %s: %w", job.url, err)
 	}
 
-	links, err := parse.ParseLinks(ctx, fetchResult.Body)
-	if err != nil {
-		return nil, fmt.Errorf("parsing links from %s: %w", job.url, err)
-	}
-
-	formattedLinks, err := c.formatLinks(links, job.url)
-	if err != nil {
-		return nil, fmt.Errorf("formatting links from %s: %w", job.url, err)
-	}
-
-	if store != nil {
-		if err := store.StoreRawData(ctx, job.url, "", string(fetchResult.Body)); err != nil {
-			c.logger.Warn("error storing raw data", "url", job.url, "error", err)
+	links := make([]string, 0)
+	for _, result := range fetchResults {
+		l, err := parse.ParseLinks(ctx, result.Body)
+		if err != nil {
+			return nil, fmt.Errorf("parsing links from %s: %w", job.url, err)
 		}
+
+		formattedLinks, err := c.formatLinks(l, job.url)
+		if err != nil {
+			return nil, fmt.Errorf("formatting links from %s: %w", job.url, err)
+		}
+
+		if store != nil {
+			if err := store.StoreRawData(ctx, job.url, "", string(result.Body)); err != nil {
+				c.logger.Warn("error storing raw data", "url", job.url, "error", err)
+			}
+		}
+		links = append(links, formattedLinks...)
 	}
 
-	return formattedLinks, nil
+	return links, nil
 }
 
 func (c *Crawler) formatLinks(links []string, baseURL string) ([]string, error) {

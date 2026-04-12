@@ -15,10 +15,12 @@ package integration
 import (
 	"golangwebcrawler/cmd/crawler/internal/crawler"
 	"golangwebcrawler/cmd/crawler/internal/fetcher/httpfetcher"
+	"golangwebcrawler/cmd/crawler/internal/fetcher/playwrightfetcher"
 	"golangwebcrawler/cmd/crawler/internal/parser"
 )
 
 var (
 	_ crawler.Fetcher = (*httpfetcher.HTTPFetcher)(nil)
 	_ crawler.Parser  = (*parser.HTTPParser)(nil)
+	_ crawler.Fetcher = (*playwrightfetcher.PlaywrightFetcher)(nil)
 )

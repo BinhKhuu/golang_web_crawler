@@ -59,7 +59,8 @@ func Test_FetchDefault(t *testing.T) {
 		t.Fatalf("creating playwright fetcher: %v", err)
 	}
 
-	res, err := fetcher.Fetch(ctx, url)
+	results, err := fetcher.Fetch(ctx, url)
+	res := results[0]
 	if err != nil {
 		t.Fatalf("fetching url %s: %v", url, err)
 	}
