@@ -208,7 +208,9 @@ func (f *PlaywrightFetcher) waitAndCollectResults(p playwright.Page) []crawler.F
 						continue
 					}
 					// todo store results in crawler results
-					results = f.fetchSPAConfigDataSelectors(p)
+					r := f.fetchSPAConfigDataSelectors(p)
+					results = append(results, r...)
+
 				}
 			}
 			break
@@ -255,7 +257,8 @@ func (f *PlaywrightFetcher) fetchSPAConfigDataSelectors(p playwright.Page) []cra
 			for _, entry := range entries {
 				textContent, err := entry.TextContent()
 				if err != nil {
-					textContent = "error getting text content"
+					// todo test this path
+					continue
 				}
 				f.logger.Info("playwright fetcher", "content", textContent)
 				results = append(results, crawler.FetchResult{

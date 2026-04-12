@@ -40,10 +40,14 @@ func Test_FetchSPAConfig(t *testing.T) {
 		fetcher.Close()
 		t.Fatalf("creating playwright fetcher: %v", err)
 	}
-	_, err = fetcher.Fetch(ctx, config.URL)
+	results, err := fetcher.Fetch(ctx, config.URL)
 	if err != nil {
 		fetcher.Close()
 		t.Fatalf("fetching url %s: %v", config.URL, err)
+	}
+	if len(results) == 0 {
+		fetcher.Close()
+		t.Fatalf("expected non-empty data, got empty")
 	}
 }
 
@@ -219,10 +223,28 @@ func Test_WaitAndCollectResults_AndfetchSPAConfigDataSelectors(t *testing.T) {
 			resultsSelectors: []string{"a[data-automation='jobTitle']"},
 			dataSelectors: []string{
 				"div[data-automation='jobDetailsPage']",
+			},
+			expectedResultCount: 3,
+		},
+		{
+			name: "should handle multiple entries under one selector with multiple data selectors",
+			html: `<html><body>
+				<a data-automation="jobTitle" href="/job/1">Job 1</a>
+				<a data-automation="jobTitle" href="/job/2">Job 2</a>
+				<a data-automation="jobTitle" href="/job/3">Job 3</a>
+				<div data-automation="jobDetailsPage">Job details content</div>
+				</body></html>
+				<div data-automation="jobDetailsPage2">Job details content2</div>
+				</body></html>
+				<div data-automation="jobDetailsPage3">Job details content3</div>
+				</body></html>`,
+			resultsSelectors: []string{"a[data-automation='jobTitle']"},
+			dataSelectors: []string{
+				"div[data-automation='jobDetailsPage']",
 				"div[data-automation='jobDetailsPage2']",
 				"div[data-automation='jobDetailsPage3']",
 			},
-			expectedResultCount: 3,
+			expectedResultCount: 9,
 		},
 	}
 	for _, tt := range tc {
