@@ -32,6 +32,15 @@ type PlaywrightFetcher struct {
 /*
 PlaywrightFetcherConfig
 Leave query and selectors empty to skip the step.
+
+the first matching selector is used for each of the following steps:
+SearchInputSelectors
+SearchQuery
+SearchSubmitSelectors
+ResultsSelectors
+
+matches multiple selectors storing results
+DataSelectors
 */
 type PlaywrightFetcherConfig struct {
 	URL                   string   `json:"url"`
