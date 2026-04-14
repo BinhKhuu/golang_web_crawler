@@ -1,10 +1,10 @@
 todo: 
 
     1. Playwright fetcher  
+        - store fetched data to db
+            - ID for fetched data in generation have a few selectors to look for when generating the id in playwrightfetcher
         - Investigate how to return network data 
         - add notes on play wright bot detection as readme
-        - do i need to test playwright configuratior ? 
-            don't think so since its play wright implementation
 
         - Update Main to select the type of fetcher through configuration for Crawler 
             - the fetcher type can be base on the Command coming in from terminal OR from api OR from enviroment what every is constructing the crawler

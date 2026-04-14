@@ -199,7 +199,7 @@ func (c *Crawler) processURL(ctx context.Context, job crawlJob, fetch Fetcher, p
 		}
 
 		if store != nil {
-			if err := store.StoreRawData(ctx, job.url, "", string(result.Body)); err != nil {
+			if err := store.StoreRawData(ctx, result.URL, "", string(result.Body)); err != nil {
 				c.logger.Warn("error storing raw data", "url", job.url, "error", err)
 			}
 		}

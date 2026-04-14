@@ -40,6 +40,11 @@ func Test_FetchSPAConfig(t *testing.T) {
 		fetcher.Close()
 		t.Fatalf("creating playwright fetcher: %v", err)
 	}
+	defer func() {
+		if closeErr := fetcher.Close(); closeErr != nil {
+			log.Printf("error closing fetcher: %v", closeErr)
+		}
+	}()
 	results, err := fetcher.Fetch(ctx, config.URL)
 	if err != nil {
 		fetcher.Close()
@@ -52,6 +57,7 @@ func Test_FetchSPAConfig(t *testing.T) {
 }
 
 // todo prevent this from running in pipeline because playwright runs in headed mode for anti bot detection.
+// test breaking
 func Test_FetchDefault(t *testing.T) {
 	if !runFetchTest {
 		t.Skip("Skipping: set RUN_LLM_TESTS=1 to run")
@@ -66,8 +72,16 @@ func Test_FetchDefault(t *testing.T) {
 	if err != nil {
 		t.Fatalf("creating playwright fetcher: %v", err)
 	}
-
+	defer func() {
+		if closeErr := fetcher.Close(); closeErr != nil {
+			log.Printf("error closing fetcher: %v", closeErr)
+		}
+	}()
 	results, err := fetcher.Fetch(ctx, url)
+	if err != nil {
+		fetcher.Close()
+		t.Fatalf("fetching url %s: %v", url, err)
+	}
 	res := results[0]
 	if err != nil {
 		t.Fatalf("fetching url %s: %v", url, err)

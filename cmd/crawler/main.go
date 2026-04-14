@@ -2,9 +2,11 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"golangwebcrawler/cmd/crawler/internal/crawler"
 	"golangwebcrawler/cmd/crawler/internal/fetcher/httpfetcher"
+	"golangwebcrawler/cmd/crawler/internal/fetcher/playwrightfetcher"
 	"golangwebcrawler/cmd/crawler/internal/parser"
 	"golangwebcrawler/internal/dbstore"
 	"golangwebcrawler/internal/storage"
@@ -49,6 +51,29 @@ func main() {
 		}
 	}()
 
+	crawlSPA(cfg, logger, database, err)
+	crawlHttp(cfg, logger, database, err)
+	logger.Info("Crawling completed.")
+}
+
+func crawlSPA(cfg *CrawlerConfig, logger *slog.Logger, database *sql.DB, err error) {
+	pwCfg := playwrightfetcher.GetSeekConfiguration()
+	f, err := playwrightfetcher.NewConfiguredPlaywrightFetcher(logger, &pwCfg)
+	if err != nil {
+		logger.Error("error creating Playwright fetcher", "error", err)
+		return
+	}
+	p := parser.NewHTTPParser()
+
+	c := crawler.NewCrawler(cfg.MaxDepth, cfg.AllowedDomains, logger)
+	storageSvc := storage.NewService(database, logger)
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+
+	err = c.Crawl(ctx, pwCfg.URL, f, p, storageSvc, defaultConcurrency)
+}
+
+func crawlHttp(cfg *CrawlerConfig, logger *slog.Logger, database *sql.DB, err error) {
 	httpClient := &http.Client{
 		Timeout: httpTimeout,
 		Transport: &http.Transport{
@@ -70,7 +95,6 @@ func main() {
 	if err != nil {
 		logger.Error("error during crawl", "error", err)
 	}
-	logger.Info("Crawling completed.")
 }
 
 type CrawlerConfig struct {

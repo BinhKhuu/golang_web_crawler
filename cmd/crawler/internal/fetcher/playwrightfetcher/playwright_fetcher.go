@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/playwright-community/playwright-go"
 )
 
@@ -90,13 +91,14 @@ func (f *PlaywrightFetcher) Fetch(ctx context.Context, url string) ([]crawler.Fe
 	return f.fetchFn(ctx, url)
 }
 
+// Todo FetchDefault do i need this? decide if this should get the Links and navigate to them then store the body
 func (f *PlaywrightFetcher) FetchDefault(ctx context.Context, url string) ([]crawler.FetchResult, error) {
 	p, err := f.browserCtx.NewPage()
 	if err != nil {
 		return []crawler.FetchResult{}, err
 	}
 	defer func() {
-		if closeErr := p.Close(); err != nil {
+		if closeErr := p.Clock(); err != nil {
 			f.logger.Error("error closing page", "error", closeErr)
 		}
 	}()
@@ -110,28 +112,27 @@ func (f *PlaywrightFetcher) FetchDefault(ctx context.Context, url string) ([]cra
 		return []crawler.FetchResult{}, err
 	}
 
-	locator := p.Locator("a[id*='job-title']")
-	err = locator.WaitFor(playwright.LocatorWaitForOptions{
-		State: playwright.WaitForSelectorStateVisible,
-	})
-	if err != nil {
-		return []crawler.FetchResult{}, err
-	}
-
 	entries, err := p.Locator(`a[id*='job-title']`).All()
 	if err != nil {
 		return []crawler.FetchResult{}, err
 	}
 
+	// todo store the actual body by going to the link or look at the network
+	results := []crawler.FetchResult{}
 	for _, entry := range entries {
 		text, err := entry.TextContent()
 		if err != nil {
 			text = "error getting text content"
 		}
 		f.logger.Info("playwright fetcher", "url", url, "content", text)
+		results = append(results, crawler.FetchResult{
+			URL:        url,
+			Body:       []byte(text),
+			StatusCode: http.StatusOK,
+		})
 	}
 
-	return []crawler.FetchResult{}, nil
+	return results, nil
 }
 
 func (f *PlaywrightFetcher) FetchSPAConfig(ctx context.Context, url string) ([]crawler.FetchResult, error) {
@@ -210,14 +211,15 @@ func (f *PlaywrightFetcher) waitAndCollectResults(p playwright.Page) []crawler.F
 			entries, err := p.Locator(sel).All()
 			if err == nil {
 				for _, entry := range entries {
-					err := entry.Click()
-					randomDelay()
+					id := createFetchId(entry, p)
+					err = entry.Click()
 					if err != nil {
 						f.logger.Error("error clicking entry", "error", err)
 						continue
 					}
+					randomDelay()
 					// todo store results in crawler results
-					r := f.fetchSPAConfigDataSelectors(p)
+					r := f.fetchSPAConfigDataSelectors(p, id)
 					results = append(results, r...)
 
 				}
@@ -226,6 +228,15 @@ func (f *PlaywrightFetcher) waitAndCollectResults(p playwright.Page) []crawler.F
 		}
 	}
 	return results
+}
+
+// todo ID for fetched data in generation have a few selectors to look for when generating the id in playwrightfetcher
+func createFetchId(entry playwright.Locator, p playwright.Page) string {
+	href, err := entry.GetAttribute("href")
+	if err != nil {
+		href = p.URL() + uuid.New().String() // fallback to current page URL if href is not available
+	}
+	return href
 }
 
 // submitSearch stops on the first matching selector
@@ -254,7 +265,7 @@ func (f *PlaywrightFetcher) fillSearchInput(p playwright.Page) {
 
 // fetchSPAConfigDataSelectors iterates through the provided data selectors in the fetch configuration,
 // attempting to locate and extract text content from elements matching those selectors on the current page.
-func (f *PlaywrightFetcher) fetchSPAConfigDataSelectors(p playwright.Page) []crawler.FetchResult {
+func (f *PlaywrightFetcher) fetchSPAConfigDataSelectors(p playwright.Page, id string) []crawler.FetchResult {
 	var results []crawler.FetchResult
 	if len(f.fetchConfig.DataSelectors) > 0 {
 		for _, sel := range f.fetchConfig.DataSelectors {
@@ -271,7 +282,7 @@ func (f *PlaywrightFetcher) fetchSPAConfigDataSelectors(p playwright.Page) []cra
 				}
 				f.logger.Info("playwright fetcher", "content", textContent)
 				results = append(results, crawler.FetchResult{
-					URL:        p.URL(), // todo get url if possible
+					URL:        id, // todo get url if possible
 					Body:       []byte(textContent),
 					StatusCode: http.StatusOK, // todo get status code if possible
 				})
