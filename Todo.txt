@@ -1,5 +1,9 @@
 todo: 
-
+    1. Update README with following information
+        - .env settings all thats needed 
+        - installs for psql and golang-migrate
+        - debug profile setup for visual studio code
+        - ollama and ollam models 
     1. Playwright fetcher  
         - store fetched data to db
             - ID for fetched data in generation have a few selectors to look for when generating the id in playwrightfetcher
