@@ -6,3 +6,9 @@ type RawData struct {
 	RawContent  string
 	FetchedAt   string
 }
+
+type RawDataItem struct {
+	URL         string
+	ContentType string
+	RawContent  string
+}

@@ -52,7 +52,7 @@ func main() {
 	}()
 
 	crawlSPA(cfg, logger, database)
-	crawlHttp(cfg, logger, database)
+	//crawlHttp(cfg, logger, databaser)
 	logger.Info("Crawling completed.")
 }
 
