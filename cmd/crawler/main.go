@@ -2,9 +2,11 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"golangwebcrawler/cmd/crawler/internal/crawler"
-	"golangwebcrawler/cmd/crawler/internal/fetcher"
+	"golangwebcrawler/cmd/crawler/internal/fetcher/httpfetcher"
+	"golangwebcrawler/cmd/crawler/internal/fetcher/playwrightfetcher"
 	"golangwebcrawler/cmd/crawler/internal/parser"
 	"golangwebcrawler/internal/dbstore"
 	"golangwebcrawler/internal/storage"
@@ -49,6 +51,33 @@ func main() {
 		}
 	}()
 
+	crawlSPA(cfg, logger, database)
+	crawlHttp(cfg, logger, database)
+	logger.Info("Crawling completed.")
+}
+
+func crawlSPA(cfg *CrawlerConfig, logger *slog.Logger, database *sql.DB) {
+	pwCfg := playwrightfetcher.GetSeekConfiguration()
+	f, err := playwrightfetcher.NewConfiguredPlaywrightFetcher(logger, &pwCfg)
+	if err != nil {
+		logger.Error("error creating Playwright fetcher", "error", err)
+		return
+	}
+	p := parser.NewHTTPParser()
+
+	c := crawler.NewCrawler(cfg.MaxDepth, cfg.AllowedDomains, logger)
+	storageSvc := storage.NewService(database, logger)
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+
+	err = c.Crawl(ctx, pwCfg.URL, f, p, storageSvc, defaultConcurrency)
+	if err != nil {
+		logger.Error("error crawling", "error", err)
+		return
+	}
+}
+
+func crawlHttp(cfg *CrawlerConfig, logger *slog.Logger, database *sql.DB) {
 	httpClient := &http.Client{
 		Timeout: httpTimeout,
 		Transport: &http.Transport{
@@ -61,16 +90,15 @@ func main() {
 	c := crawler.NewCrawler(cfg.MaxDepth, cfg.AllowedDomains, logger)
 	storageSvc := storage.NewService(database, logger)
 	p := parser.NewHTTPParser()
-	f := fetcher.NewHTTPFetcher(httpClient)
+	f := httpfetcher.NewHTTPFetcher(httpClient)
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	err = c.Crawl(ctx, "https://example.com", f, p, storageSvc, defaultConcurrency)
-	if err != nil {
-		logger.Error("error during crawl", "error", err)
+	crawlErr := c.Crawl(ctx, "https://example.com", f, p, storageSvc, defaultConcurrency)
+	if crawlErr != nil {
+		logger.Error("error during crawl", "error", crawlErr)
 	}
-	logger.Info("Crawling completed.")
 }
 
 type CrawlerConfig struct {

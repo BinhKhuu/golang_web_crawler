@@ -10,16 +10,18 @@ import (
 	"github.com/joho/godotenv"
 )
 
+var runLLMTest = false
+
 func TestMain(m *testing.M) {
 	if err := godotenv.Load("../../.env"); err != nil {
 		log.Println("No .env file found, falling back to system env")
 	}
-
+	runLLMTest = os.Getenv("RUN_LLM_TESTS") == "1"
 	os.Exit(m.Run())
 }
 
 func getTestLLMData(t *testing.T) (string, []models.ExtractedJobData) {
-	content, err := os.ReadFile("./test/testcard.txt") // Todo move testoutoput.txt to a testdata folder
+	content, err := os.ReadFile("./test/ugh.txt") // Todo move testoutoput.txt to a testdata folder
 	if err != nil {
 		t.Fatalf("Failed to read test data: %v", err)
 	}
@@ -30,16 +32,16 @@ func getExpectedLLMResults() []models.ExtractedJobData {
 	return []models.ExtractedJobData{
 		{
 			Title:    "Software Developer",
-			Company:  "Girraphic Park Pty Ltd",
-			Location: "Sydney NSW",
-			Salary:   "$95,000 - $115,000 per year",
-			Link:     "https://www.seek.com.au",
+			Company:  "Smartsoft Pty Ltd",
+			Location: "Adelaide SA",
+			Salary:   "",
+			Link:     "",
 		},
 	}
 }
 
 func Test_ParseJobDataLLM(t *testing.T) {
-	if os.Getenv("RUN_LLM_TESTS") == "" {
+	if !runLLMTest {
 		t.Skip("Skipping: set RUN_LLM_TESTS=1 to run")
 	}
 
@@ -50,7 +52,7 @@ func Test_ParseJobDataLLM(t *testing.T) {
 
 	testData, expected := getTestLLMData(t)
 	// todo fix this prompt there is a + testData at the end its a copy of the query in the jobParser which also needs fixing
-	prompt := `/no_think Forget Previous prompt Extract the following fields in JSON format: 
+	prompt := `Extract the following fields in JSON format: 
 		- job_title
 		- company_name
 		- salary_range
@@ -59,7 +61,7 @@ func Test_ParseJobDataLLM(t *testing.T) {
 		- links (single string if multiple comma separated)(this is the job advertisement URL, not the company profile or search filter)
 		- required_skills (as an array)
 		
-		IF you cannot parse the input or find the job_title and links return this text 'I am an idiot'. DO NOT ATTEMPT TO RETURN ANYTHING ELSE, NOT EVEN AN EMPTY JSON ARRAY, JUST THIS TEXT.
+		IF you cannot parse the input or find the job_title return this text 'I am an idiot'. DO NOT ATTEMPT TO RETURN ANYTHING ELSE, NOT EVEN AN EMPTY JSON ARRAY, JUST THIS TEXT.
 		IF you do find job_title and links the returned result should be an array of JSON objects  mark the JSON with` + "```json```" +
 		`at the end of the JSON to make it easier to parse in the code
 		Text to process: ` + testData
@@ -69,6 +71,7 @@ func Test_ParseJobDataLLM(t *testing.T) {
 		t.Fatalf("LLM query failed: %v", err)
 	}
 
+	// when using ugh test file these will fail
 	if jobDetails[0].Title != expected[0].Title {
 		t.Errorf("Expected Title '%s', got '%s'", expected[0].Title, jobDetails[0].Title)
 	}
@@ -83,7 +86,7 @@ func Test_ParseJobDataLLM(t *testing.T) {
 }
 
 func Test_ParseJobDataLLM_ReturnEmptyJsonWhenNoMatch(t *testing.T) {
-	if os.Getenv("RUN_LLM_TESTS") == "" {
+	if !runLLMTest {
 		t.Skip("Skipping: set RUN_LLM_TESTS=1 to run")
 	}
 
@@ -119,7 +122,7 @@ func Test_ParseJobDataLLM_ReturnEmptyJsonWhenNoMatch(t *testing.T) {
 }
 
 func Test_ParseJobDataLLM_AttemptsToFillInJsonObject(t *testing.T) {
-	if os.Getenv("RUN_LLM_TESTS") == "" {
+	if !runLLMTest {
 		t.Skip("Skipping: set RUN_LLM_TESTS=1 to run")
 	}
 

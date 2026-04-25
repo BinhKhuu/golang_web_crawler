@@ -1,4 +1,4 @@
-package fetcher
+package httpfetcher
 
 import (
 	"bytes"
@@ -28,11 +28,11 @@ func TestHTTPFetcher_Fetch(t *testing.T) {
 	fetcher := NewHTTPFetcher(mockClient)
 
 	const url = "http://example.com"
-	result, err := fetcher.Fetch(t.Context(), url)
+	results, err := fetcher.Fetch(t.Context(), url)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-
+	result := results[0]
 	if result.StatusCode != http.StatusOK {
 		t.Errorf("expected status code 200, got %d", result.StatusCode)
 	}
@@ -75,10 +75,11 @@ func Test_HTTPFetcher_Fetch_Http_404(t *testing.T) {
 	fetcher := NewHTTPFetcher(client)
 
 	const url = "https://httpbin.org/404"
-	result, err := fetcher.Fetch(t.Context(), url)
+	results, err := fetcher.Fetch(t.Context(), url)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	result := results[0]
 	if result.StatusCode != http.StatusNotFound {
 		t.Errorf("expected return 404 but got %v", result.StatusCode)
 	}

@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"golangwebcrawler/cmd/crawler/internal/fetcher"
+	"golangwebcrawler/internal/models"
 	"log/slog"
 	"reflect"
 	"sync"
@@ -30,12 +30,12 @@ type MockFetcher struct {
 	Err        error
 }
 
-func (m *MockFetcher) Fetch(ctx context.Context, url string) (fetcher.FetchResult, error) {
-	return fetcher.FetchResult{
+func (m *MockFetcher) Fetch(ctx context.Context, url string) ([]FetchResult, error) {
+	return []FetchResult{{
 		URL:        m.URL,
 		StatusCode: m.StatusCode,
 		Body:       m.Body,
-	}, m.Err
+	}}, m.Err
 }
 
 type MockParser struct {
@@ -56,6 +56,15 @@ func (m *MockStorage) StoreRawData(ctx context.Context, url, contentType, rawCon
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.Stored = append(m.Stored, url)
+	return nil
+}
+
+func (m *MockStorage) StoreRawDataBatch(ctx context.Context, items []models.RawDataItem) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, item := range items {
+		m.Stored = append(m.Stored, item.URL)
+	}
 	return nil
 }
 
@@ -496,3 +505,53 @@ func Test_Coordinator_ContextCancellation(t *testing.T) {
 		t.Logf("crawl ended with: %v", err)
 	}
 }
+
+func Test_ProcessURL_BatchStorage(t *testing.T) {
+	mockFetcher := createMockFetcher(testBaseURL, 200, []byte("mock body"), nil)
+	mockParser := createMockParser([]string{testBaseURL + "/about"}, nil)
+	mockStorage := createMockStorage()
+	c := createTestCrawler()
+
+	links, err := c.processURL(t.Context(), crawlJob{url: testBaseURL, depth: 1}, mockFetcher, mockParser, mockStorage)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(links) != 1 {
+		t.Errorf("expected 1 link, got %d", len(links))
+	}
+	if len(mockStorage.Stored) != 1 {
+		t.Errorf("expected 1 stored item, got %d", len(mockStorage.Stored))
+	}
+}
+
+func Test_ProcessURL_BatchStorageMultipleResults(t *testing.T) {
+	multiFetcher := &MultiMockFetcher{
+		Results: []FetchResult{
+			{URL: testBaseURL + "/1", Body: []byte("body 1"), StatusCode: 200},
+			{URL: testBaseURL + "/2", Body: []byte("body 2"), StatusCode: 200},
+			{URL: testBaseURL + "/3", Body: []byte("body 3"), StatusCode: 200},
+		},
+	}
+	mockParser := createMockParser([]string{}, nil)
+	mockStorage := createMockStorage()
+	c := createTestCrawler()
+
+	_, err := c.processURL(t.Context(), crawlJob{url: testBaseURL, depth: 1}, multiFetcher, mockParser, mockStorage)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(mockStorage.Stored) != 3 {
+		t.Errorf("expected 3 stored items, got %d", len(mockStorage.Stored))
+	}
+}
+
+type MultiMockFetcher struct {
+	Results []FetchResult
+	Err     error
+}
+
+func (m *MultiMockFetcher) Fetch(ctx context.Context, url string) ([]FetchResult, error) {
+	return m.Results, m.Err
+}
+
+var _ Fetcher = (*MultiMockFetcher)(nil)

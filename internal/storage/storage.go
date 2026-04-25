@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"golangwebcrawler/internal/models"
 	"log/slog"
 	"strings"
 	"time"
@@ -37,6 +38,52 @@ func (s *Service) StoreRawData(ctx context.Context, url, contentType, rawContent
 	)
 	if err != nil {
 		return fmt.Errorf("storing raw data for %s: %w", url, err)
+	}
+	return nil
+}
+
+func (s *Service) StoreRawDataBatch(ctx context.Context, items []models.RawDataItem) error {
+	if len(items) == 0 {
+		return nil
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
+	defer cancel()
+
+	txn, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("beginning transaction: %w", err)
+	}
+
+	defer func() {
+		rollbackErr := txn.Rollback()
+		if rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) {
+			s.logger.Error("failed to rollback transaction", "error", rollbackErr)
+		}
+	}()
+
+	query := `
+		INSERT INTO raw_data (url, content_type, raw_content)
+		VALUES ($1, $2, $3)
+		ON CONFLICT (url)
+		DO UPDATE SET content_type = EXCLUDED.content_type, raw_content = EXCLUDED.raw_content, fetched_at = NOW();
+	`
+
+	stmt, err := txn.PrepareContext(ctx, query)
+	if err != nil {
+		return fmt.Errorf("preparing statement: %w", err)
+	}
+	defer stmt.Close()
+
+	for _, item := range items {
+		_, err = stmt.ExecContext(ctx, item.URL, item.ContentType, item.RawContent)
+		if err != nil {
+			return fmt.Errorf("executing statement for %s: %w", item.URL, err)
+		}
+	}
+
+	if err := txn.Commit(); err != nil {
+		return fmt.Errorf("committing transaction: %w", err)
 	}
 	return nil
 }

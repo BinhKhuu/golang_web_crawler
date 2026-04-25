@@ -3,7 +3,7 @@ package crawler
 import (
 	"context"
 	"fmt"
-	"golangwebcrawler/cmd/crawler/internal/fetcher"
+	"golangwebcrawler/internal/models"
 	"log/slog"
 	"net/url"
 	"strings"
@@ -12,7 +12,13 @@ import (
 )
 
 type Fetcher interface {
-	Fetch(ctx context.Context, url string) (fetcher.FetchResult, error)
+	Fetch(ctx context.Context, url string) ([]FetchResult, error)
+}
+
+type FetchResult struct {
+	URL        string
+	StatusCode int
+	Body       []byte
 }
 
 type Parser interface {
@@ -21,6 +27,7 @@ type Parser interface {
 
 type StorageService interface {
 	StoreRawData(ctx context.Context, url, contentType, rawContent string) error
+	StoreRawDataBatch(ctx context.Context, items []models.RawDataItem) error
 }
 
 type Crawler struct {
@@ -176,28 +183,39 @@ func (c *Crawler) processURL(ctx context.Context, job crawlJob, fetch Fetcher, p
 	default:
 	}
 
-	fetchResult, err := fetch.Fetch(ctx, job.url)
+	fetchResults, err := fetch.Fetch(ctx, job.url)
 	if err != nil {
 		return nil, fmt.Errorf("fetching %s: %w", job.url, err)
 	}
 
-	links, err := parse.ParseLinks(ctx, fetchResult.Body)
-	if err != nil {
-		return nil, fmt.Errorf("parsing links from %s: %w", job.url, err)
+	links := make([]string, 0)
+	batch := make([]models.RawDataItem, 0, len(fetchResults))
+	for _, result := range fetchResults {
+		l, err := parse.ParseLinks(ctx, result.Body)
+		if err != nil {
+			return nil, fmt.Errorf("parsing links from %s: %w", job.url, err)
+		}
+
+		formattedLinks, err := c.formatLinks(l, job.url)
+		if err != nil {
+			return nil, fmt.Errorf("formatting links from %s: %w", job.url, err)
+		}
+
+		batch = append(batch, models.RawDataItem{
+			URL:         result.URL,
+			ContentType: "text/html",
+			RawContent:  string(result.Body),
+		})
+		links = append(links, formattedLinks...)
 	}
 
-	formattedLinks, err := c.formatLinks(links, job.url)
-	if err != nil {
-		return nil, fmt.Errorf("formatting links from %s: %w", job.url, err)
-	}
-
-	if store != nil {
-		if err := store.StoreRawData(ctx, job.url, "", string(fetchResult.Body)); err != nil {
-			c.logger.Warn("error storing raw data", "url", job.url, "error", err)
+	if store != nil && len(batch) > 0 {
+		if err := store.StoreRawDataBatch(ctx, batch); err != nil {
+			c.logger.Warn("error storing raw data batch", "url", job.url, "error", err)
 		}
 	}
 
-	return formattedLinks, nil
+	return links, nil
 }
 
 func (c *Crawler) formatLinks(links []string, baseURL string) ([]string, error) {
