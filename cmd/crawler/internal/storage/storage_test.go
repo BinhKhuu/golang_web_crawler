@@ -1,4 +1,4 @@
-package storage
+package storage_test
 
 import (
 	"context"
@@ -6,7 +6,9 @@ import (
 	"golangwebcrawler/cmd/crawler/internal/config"
 	"golangwebcrawler/internal/dbstore"
 	"golangwebcrawler/internal/models"
+	"golangwebcrawler/internal/storage"
 	"golangwebcrawler/internal/testhelpers"
+	"log/slog"
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
@@ -52,26 +54,78 @@ func Test_Migrations(t *testing.T) {
 	}
 }
 
-func Test_StoreRawData_Upserts(t *testing.T) {
+func Test_StoreRawDataBatch_Success(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
 	defer db.Close()
 
-	storage := NewDBStorageService(db)
-	rawData := models.RawData{
-		URL:         "http://example.com",
-		ContentType: "text/html",
-		RawContent:  "<html><body>Example</body></html>",
+	svc := storage.NewService(db, slog.Default())
+	items := []models.RawDataItem{
+		{URL: "http://example.com/1", ContentType: "text/html", RawContent: "<html>1</html>"},
+		{URL: "http://example.com/2", ContentType: "text/html", RawContent: "<html>2</html>"},
+		{URL: "http://example.com/3", ContentType: "text/html", RawContent: "<html>3</html>"},
 	}
 
-	mock.ExpectExec("INSERT INTO raw_data").
-		WithArgs(rawData.URL, rawData.ContentType, rawData.RawContent).
-		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectBegin()
+	mock.ExpectPrepare("INSERT INTO raw_data")
+	for _, item := range items {
+		mock.ExpectExec("INSERT INTO raw_data").
+			WithArgs(item.URL, item.ContentType, item.RawContent).
+			WillReturnResult(sqlmock.NewResult(0, 1))
+	}
+	mock.ExpectCommit()
 
-	if err := storage.StoreRawData(context.Background(), rawData); err != nil {
+	if err := svc.StoreRawDataBatch(context.Background(), items); err != nil {
 		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %s", err)
+	}
+}
+
+func Test_StoreRawDataBatch_EmptyItems(t *testing.T) {
+	db, _, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+	defer db.Close()
+
+	svc := storage.NewService(db, slog.Default())
+
+	if err := svc.StoreRawDataBatch(context.Background(), []models.RawDataItem{}); err != nil {
+		t.Fatalf("expected no error for empty items, got %v", err)
+	}
+}
+
+func Test_StoreRawDataBatch_RollbackOnError(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+	defer db.Close()
+
+	svc := storage.NewService(db, slog.Default())
+	items := []models.RawDataItem{
+		{URL: "http://example.com/1", ContentType: "text/html", RawContent: "<html>1</html>"},
+		{URL: "http://example.com/2", ContentType: "text/html", RawContent: "<html>2</html>"},
+	}
+
+	mock.ExpectBegin()
+	mock.ExpectPrepare("INSERT INTO raw_data")
+	mock.ExpectExec("INSERT INTO raw_data").
+		WithArgs(items[0].URL, items[0].ContentType, items[0].RawContent).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec("INSERT INTO raw_data").
+		WithArgs(items[1].URL, items[1].ContentType, items[1].RawContent).
+		WillReturnError(sql.ErrConnDone)
+	mock.ExpectRollback()
+
+	err = svc.StoreRawDataBatch(context.Background(), items)
+	if err == nil {
+		t.Fatal("expected error, got nil")
 	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {

@@ -3,6 +3,7 @@ package crawler
 import (
 	"context"
 	"fmt"
+	"golangwebcrawler/internal/models"
 	"log/slog"
 	"net/url"
 	"strings"
@@ -26,6 +27,7 @@ type Parser interface {
 
 type StorageService interface {
 	StoreRawData(ctx context.Context, url, contentType, rawContent string) error
+	StoreRawDataBatch(ctx context.Context, items []models.RawDataItem) error
 }
 
 type Crawler struct {
@@ -187,6 +189,7 @@ func (c *Crawler) processURL(ctx context.Context, job crawlJob, fetch Fetcher, p
 	}
 
 	links := make([]string, 0)
+	batch := make([]models.RawDataItem, 0, len(fetchResults))
 	for _, result := range fetchResults {
 		l, err := parse.ParseLinks(ctx, result.Body)
 		if err != nil {
@@ -198,12 +201,18 @@ func (c *Crawler) processURL(ctx context.Context, job crawlJob, fetch Fetcher, p
 			return nil, fmt.Errorf("formatting links from %s: %w", job.url, err)
 		}
 
-		if store != nil {
-			if err := store.StoreRawData(ctx, result.URL, "", string(result.Body)); err != nil {
-				c.logger.Warn("error storing raw data", "url", job.url, "error", err)
-			}
-		}
+		batch = append(batch, models.RawDataItem{
+			URL:         result.URL,
+			ContentType: "text/html",
+			RawContent:  string(result.Body),
+		})
 		links = append(links, formattedLinks...)
+	}
+
+	if store != nil && len(batch) > 0 {
+		if err := store.StoreRawDataBatch(ctx, batch); err != nil {
+			c.logger.Warn("error storing raw data batch", "url", job.url, "error", err)
+		}
 	}
 
 	return links, nil
