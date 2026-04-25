@@ -229,8 +229,7 @@ func (f *PlaywrightFetcher) waitAndCollectResults(ctx context.Context, p playwri
 				return results, err
 			}
 
-			err := waitForElementVisibility(f, p, sel)
-			if err != nil {
+			if err := waitForElementVisibility(f, p, sel); err != nil {
 				continue
 			}
 
