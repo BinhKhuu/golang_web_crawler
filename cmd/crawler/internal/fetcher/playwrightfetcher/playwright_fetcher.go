@@ -245,21 +245,9 @@ func (f *PlaywrightFetcher) waitAndCollectResults(ctx context.Context, p playwri
 					if ctxErr := ctx.Err(); ctxErr != nil {
 						return results, ctxErr
 					}
-
-					id := createFetchId(entry, p)
-					err = entry.Click()
-					if err != nil {
-						f.logger.Error("error clicking entry", "error", err)
+					r, selectErr := f.fetchSPAConfigClickAction(ctx, entry, p)
+					if selectErr != nil || r == nil {
 						continue
-					}
-					err = randomDelay(ctx)
-					if err != nil {
-						return results, err
-					}
-					// todo store results in crawler results
-					r, err := f.fetchSPAConfigDataSelectors(ctx, p, id)
-					if err != nil {
-						return results, err
 					}
 					results = append(results, r...)
 				}
@@ -268,6 +256,26 @@ func (f *PlaywrightFetcher) waitAndCollectResults(ctx context.Context, p playwri
 		}
 	}
 	return results, nil
+}
+
+func (f *PlaywrightFetcher) fetchSPAConfigClickAction(ctx context.Context, entry playwright.Locator, p playwright.Page) ([]crawler.FetchResult, error) {
+	id := createFetchId(entry, p)
+	err := entry.Click()
+	if err != nil {
+		f.logger.Error("error clicking entry", "error", err)
+		return nil, err
+	}
+	delayErr := randomDelay(ctx)
+	if delayErr != nil {
+		return nil, delayErr
+	}
+
+	r, fetchErr := f.fetchSPAConfigDataSelectors(ctx, p, id)
+	if fetchErr != nil {
+		return nil, fetchErr
+	}
+
+	return r, nil
 }
 
 // todo ID for fetched data in generation have a few selectors to look for when generating the id in playwrightfetcher.
