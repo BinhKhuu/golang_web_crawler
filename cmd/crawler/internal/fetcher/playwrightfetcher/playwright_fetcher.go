@@ -81,7 +81,6 @@ func configurePlaywright(f *PlaywrightFetcher, logger *slog.Logger) (*Playwright
 	return f, nil
 }
 
-// todo add channel and defer ctx close logic.
 func (f *PlaywrightFetcher) Fetch(ctx context.Context, url string) ([]crawler.FetchResult, error) {
 	return f.fetchFn(ctx, url)
 }
@@ -103,8 +102,8 @@ func (f *PlaywrightFetcher) FetchDefault(ctx context.Context, url string) ([]cra
 	}()
 
 	const timeoutInMs = 30000
-	if err := ctx.Err(); err != nil {
-		return []crawler.FetchResult{}, err
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		return []crawler.FetchResult{}, ctxErr
 	}
 	_, err = p.Goto(url, playwright.PageGotoOptions{
 		WaitUntil: playwright.WaitUntilStateNetworkidle,
@@ -161,8 +160,8 @@ func (f *PlaywrightFetcher) FetchSPAConfig(ctx context.Context, url string) ([]c
 	}
 
 	const timeoutInMs = 30000
-	if err := ctx.Err(); err != nil {
-		return []crawler.FetchResult{}, err
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		return []crawler.FetchResult{}, ctxErr
 	}
 	_, err = p.Goto(url, playwright.PageGotoOptions{
 		WaitUntil: playwright.WaitUntilStateNetworkidle,
@@ -172,11 +171,11 @@ func (f *PlaywrightFetcher) FetchSPAConfig(ctx context.Context, url string) ([]c
 		return []crawler.FetchResult{}, err
 	}
 
-	if err := f.fillSearchInput(ctx, p); err != nil {
-		return []crawler.FetchResult{}, err
+	if loadErr := f.fillSearchInput(ctx, p); loadErr != nil {
+		return []crawler.FetchResult{}, loadErr
 	}
-	if err := f.submitSearch(ctx, p); err != nil {
-		return []crawler.FetchResult{}, err
+	if searchErr := f.submitSearch(ctx, p); searchErr != nil {
+		return []crawler.FetchResult{}, searchErr
 	}
 	results, err := f.waitAndCollectResults(ctx, p)
 	if err != nil {
@@ -243,8 +242,8 @@ func (f *PlaywrightFetcher) waitAndCollectResults(ctx context.Context, p playwri
 			entries, err := p.Locator(sel).All()
 			if err == nil {
 				for _, entry := range entries {
-					if err := ctx.Err(); err != nil {
-						return results, err
+					if ctxErr := ctx.Err(); ctxErr != nil {
+						return results, ctxErr
 					}
 
 					id := createFetchId(entry, p)
