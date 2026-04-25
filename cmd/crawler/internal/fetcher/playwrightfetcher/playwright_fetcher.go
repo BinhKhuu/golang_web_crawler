@@ -229,12 +229,7 @@ func (f *PlaywrightFetcher) waitAndCollectResults(ctx context.Context, p playwri
 				return results, err
 			}
 
-			timeout := float64(f.fetchConfig.Timeout)
-			locator := p.Locator(sel)
-			err := locator.First().WaitFor(playwright.LocatorWaitForOptions{
-				State:   playwright.WaitForSelectorStateVisible,
-				Timeout: playwright.Float(timeout),
-			})
+			err := waitForElementVisibility(f, p, sel)
 			if err != nil {
 				continue
 			}
@@ -256,6 +251,16 @@ func (f *PlaywrightFetcher) waitAndCollectResults(ctx context.Context, p playwri
 		}
 	}
 	return results, nil
+}
+
+func waitForElementVisibility(f *PlaywrightFetcher, p playwright.Page, sel string) error {
+	timeout := float64(f.fetchConfig.Timeout)
+	locator := p.Locator(sel)
+	err := locator.First().WaitFor(playwright.LocatorWaitForOptions{
+		State:   playwright.WaitForSelectorStateVisible,
+		Timeout: playwright.Float(timeout),
+	})
+	return err
 }
 
 func (f *PlaywrightFetcher) fetchSPAConfigClickAction(ctx context.Context, entry playwright.Locator, p playwright.Page) ([]crawler.FetchResult, error) {
