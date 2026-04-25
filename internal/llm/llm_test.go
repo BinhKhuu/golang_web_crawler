@@ -32,10 +32,10 @@ func getExpectedLLMResults() []models.ExtractedJobData {
 	return []models.ExtractedJobData{
 		{
 			Title:    "Software Developer",
-			Company:  "Girraphic Park Pty Ltd",
-			Location: "Sydney NSW",
-			Salary:   "$95,000 - $115,000 per year",
-			Link:     "https://www.seek.com.au",
+			Company:  "Smartsoft Pty Ltd",
+			Location: "Adelaide SA",
+			Salary:   "",
+			Link:     "",
 		},
 	}
 }
