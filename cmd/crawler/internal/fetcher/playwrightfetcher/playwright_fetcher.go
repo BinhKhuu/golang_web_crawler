@@ -41,7 +41,7 @@ SearchSubmitSelectors
 ResultsSelectors
 
 matches multiple selectors storing results
-DataSelectors
+DataSelectors.
 */
 type PlaywrightFetcherConfig struct {
 	URL                   string   `json:"url"`
@@ -82,17 +82,16 @@ func configurePlaywright(f *PlaywrightFetcher, logger *slog.Logger) (*Playwright
 }
 
 // todo add channel and defer ctx close logic.
-/*
-	1. Playwright Fetcher can return multiple crawler results. Need to design now Crawler can handle an array of returned items
-		- might be best to change the return type to slice of FetchResults this can allow for 0 - many results
-	2. Look into inspecing the network for data
-*/
 func (f *PlaywrightFetcher) Fetch(ctx context.Context, url string) ([]crawler.FetchResult, error) {
 	return f.fetchFn(ctx, url)
 }
 
-// Todo FetchDefault do i need this? decide if this should get the Links and navigate to them then store the body
+// FetchDefault fetches the page using Playwright's default settings. Only links are traversed.
 func (f *PlaywrightFetcher) FetchDefault(ctx context.Context, url string) ([]crawler.FetchResult, error) {
+	if err := ctx.Err(); err != nil {
+		return []crawler.FetchResult{}, err
+	}
+
 	p, err := f.browserCtx.NewPage()
 	if err != nil {
 		return []crawler.FetchResult{}, err
@@ -104,6 +103,9 @@ func (f *PlaywrightFetcher) FetchDefault(ctx context.Context, url string) ([]cra
 	}()
 
 	const timeoutInMs = 30000
+	if err := ctx.Err(); err != nil {
+		return []crawler.FetchResult{}, err
+	}
 	_, err = p.Goto(url, playwright.PageGotoOptions{
 		WaitUntil: playwright.WaitUntilStateNetworkidle,
 		Timeout:   playwright.Float(timeoutInMs),
@@ -120,6 +122,10 @@ func (f *PlaywrightFetcher) FetchDefault(ctx context.Context, url string) ([]cra
 	// todo store the actual body by going to the link or look at the network
 	results := []crawler.FetchResult{}
 	for _, entry := range entries {
+		if err := ctx.Err(); err != nil {
+			return results, err
+		}
+
 		text, err := entry.TextContent()
 		if err != nil {
 			text = "error getting text content"
@@ -136,6 +142,10 @@ func (f *PlaywrightFetcher) FetchDefault(ctx context.Context, url string) ([]cra
 }
 
 func (f *PlaywrightFetcher) FetchSPAConfig(ctx context.Context, url string) ([]crawler.FetchResult, error) {
+	if err := ctx.Err(); err != nil {
+		return []crawler.FetchResult{}, err
+	}
+
 	p, err := f.browserCtx.NewPage()
 	if err != nil {
 		return []crawler.FetchResult{}, err
@@ -151,6 +161,9 @@ func (f *PlaywrightFetcher) FetchSPAConfig(ctx context.Context, url string) ([]c
 	}
 
 	const timeoutInMs = 30000
+	if err := ctx.Err(); err != nil {
+		return []crawler.FetchResult{}, err
+	}
 	_, err = p.Goto(url, playwright.PageGotoOptions{
 		WaitUntil: playwright.WaitUntilStateNetworkidle,
 		Timeout:   playwright.Float(timeoutInMs),
@@ -159,18 +172,33 @@ func (f *PlaywrightFetcher) FetchSPAConfig(ctx context.Context, url string) ([]c
 		return []crawler.FetchResult{}, err
 	}
 
-	f.fillSearchInput(p)
-	f.submitSearch(p)
-	results := f.waitAndCollectResults(p)
+	if err := f.fillSearchInput(ctx, p); err != nil {
+		return []crawler.FetchResult{}, err
+	}
+	if err := f.submitSearch(ctx, p); err != nil {
+		return []crawler.FetchResult{}, err
+	}
+	results, err := f.waitAndCollectResults(ctx, p)
+	if err != nil {
+		return results, err
+	}
 	return results, nil
 }
 
-func randomDelay() {
+func randomDelay(ctx context.Context) error {
 	const randValue = 1000
 	const randRange = 2000
 	// #nosec G404 - math/rand is sufficient for network jitter
 	delay := time.Duration(randValue+rand.Intn(randRange)) * time.Millisecond
-	time.Sleep(delay)
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
 }
 
 // Close Call to prevent resource leaks. Should be deferred right after creating the fetcher instance.
@@ -194,10 +222,14 @@ func (f *PlaywrightFetcher) Close() error {
 }
 
 // waitAndCollectResults stops on first matching selector.
-func (f *PlaywrightFetcher) waitAndCollectResults(p playwright.Page) []crawler.FetchResult {
+func (f *PlaywrightFetcher) waitAndCollectResults(ctx context.Context, p playwright.Page) ([]crawler.FetchResult, error) {
 	var results []crawler.FetchResult
 	if len(f.fetchConfig.ResultsSelectors) > 0 {
 		for _, sel := range f.fetchConfig.ResultsSelectors {
+			if err := ctx.Err(); err != nil {
+				return results, err
+			}
+
 			timeout := float64(f.fetchConfig.Timeout)
 			locator := p.Locator(sel)
 			err := locator.First().WaitFor(playwright.LocatorWaitForOptions{
@@ -211,26 +243,35 @@ func (f *PlaywrightFetcher) waitAndCollectResults(p playwright.Page) []crawler.F
 			entries, err := p.Locator(sel).All()
 			if err == nil {
 				for _, entry := range entries {
+					if err := ctx.Err(); err != nil {
+						return results, err
+					}
+
 					id := createFetchId(entry, p)
 					err = entry.Click()
 					if err != nil {
 						f.logger.Error("error clicking entry", "error", err)
 						continue
 					}
-					randomDelay()
+					err = randomDelay(ctx)
+					if err != nil {
+						return results, err
+					}
 					// todo store results in crawler results
-					r := f.fetchSPAConfigDataSelectors(p, id)
+					r, err := f.fetchSPAConfigDataSelectors(ctx, p, id)
+					if err != nil {
+						return results, err
+					}
 					results = append(results, r...)
-
 				}
 			}
 			break
 		}
 	}
-	return results
+	return results, nil
 }
 
-// todo ID for fetched data in generation have a few selectors to look for when generating the id in playwrightfetcher
+// todo ID for fetched data in generation have a few selectors to look for when generating the id in playwrightfetcher.
 func createFetchId(entry playwright.Locator, p playwright.Page) string {
 	href, err := entry.GetAttribute("href")
 	if err != nil {
@@ -239,42 +280,70 @@ func createFetchId(entry playwright.Locator, p playwright.Page) string {
 	return href
 }
 
-// submitSearch stops on the first matching selector
-func (f *PlaywrightFetcher) submitSearch(p playwright.Page) {
+// submitSearch stops on the first matching selector.
+func (f *PlaywrightFetcher) submitSearch(ctx context.Context, p playwright.Page) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
 	if len(f.fetchConfig.SearchSubmitSelectors) > 0 {
 		for _, btn := range f.fetchConfig.SearchSubmitSelectors {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+
 			err := p.Locator(btn).Click()
 			if err == nil {
 				break
 			}
 		}
 	}
+
+	return nil
 }
 
-// fillSearchInput stops on the first matching selector
-func (f *PlaywrightFetcher) fillSearchInput(p playwright.Page) {
+// fillSearchInput stops on the first matching selector.
+func (f *PlaywrightFetcher) fillSearchInput(ctx context.Context, p playwright.Page) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
 	if len(f.fetchConfig.SearchInputSelectors) > 0 {
 		for _, sel := range f.fetchConfig.SearchInputSelectors {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+
 			err := p.Locator(sel).Fill(f.fetchConfig.SearchQuery)
 			if err == nil {
 				break
 			}
 		}
 	}
+
+	return nil
 }
 
 // fetchSPAConfigDataSelectors iterates through the provided data selectors in the fetch configuration,
 // attempting to locate and extract text content from elements matching those selectors on the current page.
-func (f *PlaywrightFetcher) fetchSPAConfigDataSelectors(p playwright.Page, id string) []crawler.FetchResult {
+func (f *PlaywrightFetcher) fetchSPAConfigDataSelectors(ctx context.Context, p playwright.Page, id string) ([]crawler.FetchResult, error) {
 	var results []crawler.FetchResult
 	if len(f.fetchConfig.DataSelectors) > 0 {
 		for _, sel := range f.fetchConfig.DataSelectors {
+			if err := ctx.Err(); err != nil {
+				return results, err
+			}
+
 			entries, err := p.Locator(sel).All()
 			if err != nil {
 				continue
 			}
 
 			for _, entry := range entries {
+				if err := ctx.Err(); err != nil {
+					return results, err
+				}
+
 				textContent, err := entry.TextContent()
 				if err != nil {
 					// todo test this path
@@ -290,7 +359,7 @@ func (f *PlaywrightFetcher) fetchSPAConfigDataSelectors(p playwright.Page, id st
 		}
 	}
 
-	return results
+	return results, nil
 }
 
 // configurePlaywrightBrowser sets up a Playwright browser instance with enhanced stealth options to better mimic human behavior and avoid detection by anti-bot measures.

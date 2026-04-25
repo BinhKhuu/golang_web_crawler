@@ -56,8 +56,6 @@ func Test_FetchSPAConfig(t *testing.T) {
 	}
 }
 
-// todo prevent this from running in pipeline because playwright runs in headed mode for anti bot detection.
-// test breaking
 func Test_FetchDefault(t *testing.T) {
 	if !runFetchTest {
 		t.Skip("Skipping: set RUN_LLM_TESTS=1 to run")
@@ -83,9 +81,6 @@ func Test_FetchDefault(t *testing.T) {
 		t.Fatalf("fetching url %s: %v", url, err)
 	}
 	res := results[0]
-	if err != nil {
-		t.Fatalf("fetching url %s: %v", url, err)
-	}
 
 	if !utf8.Valid(res.Body) {
 		t.Fatalf("expected valid UTF-8 body, got invalid data")
@@ -289,7 +284,10 @@ func Test_WaitAndCollectResults_AndfetchSPAConfigDataSelectors(t *testing.T) {
 				t.Fatalf("page.Goto() error = %v", err)
 			}
 
-			results := f.waitAndCollectResults(p)
+			results, err := f.waitAndCollectResults(context.Background(), p)
+			if err != nil {
+				t.Fatalf("waitAndCollectResults() error = %v", err)
+			}
 			if len(results) != tt.expectedResultCount {
 				t.Errorf("error expected to return %d results, got %d", tt.expectedResultCount, len(results))
 			}

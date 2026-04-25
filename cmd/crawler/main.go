@@ -51,12 +51,12 @@ func main() {
 		}
 	}()
 
-	crawlSPA(cfg, logger, database, err)
-	crawlHttp(cfg, logger, database, err)
+	crawlSPA(cfg, logger, database)
+	crawlHttp(cfg, logger, database)
 	logger.Info("Crawling completed.")
 }
 
-func crawlSPA(cfg *CrawlerConfig, logger *slog.Logger, database *sql.DB, err error) {
+func crawlSPA(cfg *CrawlerConfig, logger *slog.Logger, database *sql.DB) {
 	pwCfg := playwrightfetcher.GetSeekConfiguration()
 	f, err := playwrightfetcher.NewConfiguredPlaywrightFetcher(logger, &pwCfg)
 	if err != nil {
@@ -71,9 +71,13 @@ func crawlSPA(cfg *CrawlerConfig, logger *slog.Logger, database *sql.DB, err err
 	defer cancel()
 
 	err = c.Crawl(ctx, pwCfg.URL, f, p, storageSvc, defaultConcurrency)
+	if err != nil {
+		logger.Error("error crawling", "error", err)
+		return
+	}
 }
 
-func crawlHttp(cfg *CrawlerConfig, logger *slog.Logger, database *sql.DB, err error) {
+func crawlHttp(cfg *CrawlerConfig, logger *slog.Logger, database *sql.DB) {
 	httpClient := &http.Client{
 		Timeout: httpTimeout,
 		Transport: &http.Transport{
@@ -91,9 +95,9 @@ func crawlHttp(cfg *CrawlerConfig, logger *slog.Logger, database *sql.DB, err er
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	err = c.Crawl(ctx, "https://example.com", f, p, storageSvc, defaultConcurrency)
-	if err != nil {
-		logger.Error("error during crawl", "error", err)
+	crawlErr := c.Crawl(ctx, "https://example.com", f, p, storageSvc, defaultConcurrency)
+	if crawlErr != nil {
+		logger.Error("error during crawl", "error", crawlErr)
 	}
 }
 

@@ -1,9 +1,8 @@
 todo: 
-    1. Update README with following information
-        - .env settings all thats needed 
-        - installs for psql and golang-migrate
-        - debug profile setup for visual studio code
-        - ollama and ollam models 
+
+    1. StorageService Batch is not actually batch but many inserts in a loop look for a way to insert batch
+    1. Orchestrator create one that schedules the crawls and db saves.
+
     1. Playwright fetcher  
         - store fetched data to db
             - ID for fetched data in generation have a few selectors to look for when generating the id in playwrightfetcher
