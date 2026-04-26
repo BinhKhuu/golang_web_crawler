@@ -65,6 +65,10 @@ func Test_StoreRawDataBatch(t *testing.T) {
 			WillReturnResult(sqlmock.NewResult(0, 1))
 	}
 
+	// pq.CopyIn requires a final Exec() with no args to flush the COPY stream.
+	mock.ExpectExec(`COPY "raw_data_batch"`).
+		WillReturnResult(sqlmock.NewResult(0, 0))
+
 	mock.ExpectExec(`INSERT INTO raw_data \(url, content_type, raw_content\)\s+SELECT url, content_type, raw_content FROM raw_data_batch\s+ON CONFLICT \(url\)\s+DO UPDATE SET content_type = EXCLUDED.content_type,\s+raw_content = EXCLUDED.raw_content,\s+fetched_at = NOW\(\)`).
 		WillReturnResult(sqlmock.NewResult(0, int64(len(items))))
 	mock.ExpectCommit()
