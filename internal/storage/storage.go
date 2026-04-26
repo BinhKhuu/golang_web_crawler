@@ -62,24 +62,37 @@ func (s *Service) StoreRawDataBatch(ctx context.Context, items []models.RawDataI
 		}
 	}()
 
-	query := `
-		INSERT INTO raw_data (url, content_type, raw_content)
-		VALUES ($1, $2, $3)
-		ON CONFLICT (url)
-		DO UPDATE SET content_type = EXCLUDED.content_type, raw_content = EXCLUDED.raw_content, fetched_at = NOW();
-	`
-
-	stmt, err := txn.PrepareContext(ctx, query)
-	if err != nil {
-		return fmt.Errorf("preparing statement: %w", err)
+	if _, err := txn.ExecContext(ctx,
+		`CREATE TEMP TABLE raw_data_batch (url TEXT, content_type TEXT, raw_content TEXT) ON COMMIT DROP`); err != nil {
+		return fmt.Errorf("creating temp table: %w", err)
 	}
-	defer stmt.Close()
+
+	stmt, err := txn.PrepareContext(ctx, pq.CopyIn("raw_data_batch",
+		"url", "content_type", "raw_content"))
+	if err != nil {
+		return fmt.Errorf("preparing copy statement: %w", err)
+	}
 
 	for _, item := range items {
 		_, err = stmt.ExecContext(ctx, item.URL, item.ContentType, item.RawContent)
 		if err != nil {
-			return fmt.Errorf("executing statement for %s: %w", item.URL, err)
+			stmt.Close()
+			return fmt.Errorf("executing copy for %s: %w", item.URL, err)
 		}
+	}
+
+	if err := stmt.Close(); err != nil {
+		return fmt.Errorf("finishing copy: %w", err)
+	}
+
+	if _, err := txn.ExecContext(ctx,
+		`INSERT INTO raw_data (url, content_type, raw_content)
+		SELECT url, content_type, raw_content FROM raw_data_batch
+		ON CONFLICT (url)
+		DO UPDATE SET content_type = EXCLUDED.content_type,
+		              raw_content = EXCLUDED.raw_content,
+		              fetched_at = NOW()`); err != nil {
+		return fmt.Errorf("upserting from temp table: %w", err)
 	}
 
 	if err := txn.Commit(); err != nil {

@@ -3,7 +3,6 @@ package storage
 import (
 	"context"
 	"golangwebcrawler/internal/models"
-	"golangwebcrawler/internal/typeutil"
 	"log/slog"
 	"strings"
 	"testing"
@@ -18,10 +17,9 @@ func Test_GetLatestRawData_ReturnsRawData(t *testing.T) {
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
-
 	defer db.Close()
 
-	storageService := NewDBStorageService(db, slog.Default())
+	storageService := NewService(db, slog.Default())
 	timeParam := time.Now().Add(-time.Hour)
 
 	rows := sqlmock.NewRows([]string{"url", "content_type", "raw_content"}).
@@ -44,6 +42,42 @@ func Test_GetLatestRawData_ReturnsRawData(t *testing.T) {
 	}
 }
 
+func Test_StoreRawDataBatch(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+	defer db.Close()
+
+	storageService := NewService(db, slog.Default())
+	items := []models.RawDataItem{
+		{URL: "http://example1.com", ContentType: "text/html", RawContent: "<html>1</html>"},
+		{URL: "http://example2.com", ContentType: "text/html", RawContent: "<html>2</html>"},
+	}
+
+	mock.ExpectBegin()
+	mock.ExpectExec(`CREATE TEMP TABLE raw_data_batch`).WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectPrepare(`COPY "raw_data_batch" \("url", "content_type", "raw_content"\) FROM STDIN`)
+
+	for _, item := range items {
+		mock.ExpectExec(`COPY "raw_data_batch"`).
+			WithArgs(item.URL, item.ContentType, item.RawContent).
+			WillReturnResult(sqlmock.NewResult(0, 1))
+	}
+
+	mock.ExpectExec(`INSERT INTO raw_data \(url, content_type, raw_content\)\s+SELECT url, content_type, raw_content FROM raw_data_batch\s+ON CONFLICT \(url\)\s+DO UPDATE SET content_type = EXCLUDED.content_type,\s+raw_content = EXCLUDED.raw_content,\s+fetched_at = NOW\(\)`).
+		WillReturnResult(sqlmock.NewResult(0, int64(len(items))))
+	mock.ExpectCommit()
+
+	if err := storageService.StoreRawDataBatch(context.Background(), items); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unfulfilled expectations: %s", err)
+	}
+}
+
 func Test_StoreExtractedJobDataBatch(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
@@ -51,7 +85,7 @@ func Test_StoreExtractedJobDataBatch(t *testing.T) {
 	}
 	defer db.Close()
 
-	storageService := NewDBStorageService(db, slog.Default())
+	storageService := NewService(db, slog.Default())
 	jobCards := mockJobCards()
 	mock.ExpectBegin()
 
@@ -70,8 +104,8 @@ func Test_StoreExtractedJobDataBatch(t *testing.T) {
 	}
 }
 
-func mockJobCards() []models.ExtractedJobData {
-	jobCards := []models.ExtractedJobData{
+func mockJobCards() []ExtractedJobData {
+	return []ExtractedJobData{
 		{
 			Title:    "Software Engineer",
 			Company:  "Example Inc",
@@ -89,7 +123,6 @@ func mockJobCards() []models.ExtractedJobData {
 			Skills:   []string{"Python", "AWS"},
 		},
 	}
-	return jobCards
 }
 
 func Test_StoreExtractedJobDataBatchUpSert(t *testing.T) {
@@ -99,7 +132,7 @@ func Test_StoreExtractedJobDataBatchUpSert(t *testing.T) {
 	}
 	defer db.Close()
 
-	storageService := NewDBStorageService(db, slog.Default())
+	storageService := NewService(db, slog.Default())
 	jobCards := mockJobCards()
 
 	mock.ExpectBegin()
@@ -123,7 +156,7 @@ func Test_StoreJobListingData(t *testing.T) {
 	}
 	defer db.Close()
 
-	storageService := NewDBStorageService(db, slog.Default())
+	storageService := NewService(db, slog.Default())
 	jobListing := getMockJobListing()
 
 	mock.ExpectExec("INSERT INTO job_listings").
@@ -139,23 +172,30 @@ func Test_StoreJobListingData(t *testing.T) {
 	}
 }
 
-func getMockJobListing() models.JobListing {
-	jobListing := models.JobListing{
+func getMockJobListing() JobListing {
+	return JobListing{
 		Company:         "Example Inc",
 		RemoteFlag:      true,
 		Location:        "Remote",
-		SalaryMin:       typeutil.FloatPtr(750000.50),
-		SalaryMax:       typeutil.FloatPtr(150000),
+		SalaryMin:       floatPtr(750000.50),
+		SalaryMax:       floatPtr(150000),
 		Currency:        "USD",
 		DescriptionHTML: "<p>Job description</p>",
 		DescriptionText: "Job description",
-		PostedDate:      typeutil.TimePtr(time.Now()),
-		ExpiresAt:       typeutil.TimePtr(time.Now().Add(30 * 24 * time.Hour)),
+		PostedDate:      timePtr(time.Now()),
+		ExpiresAt:       timePtr(time.Now().Add(30 * 24 * time.Hour)),
 		Source:          "ExampleSource",
 		SourceID:        "12345",
 		URL:             "http://example.com/job/12345",
 		Tags:            []string{"Go", "Remote"},
 		RawJSON:         []byte(`{"title": "Software Engineer"}`),
 	}
-	return jobListing
+}
+
+func floatPtr(f float64) *float64 {
+	return &f
+}
+
+func timePtr(t time.Time) *time.Time {
+	return &t
 }
