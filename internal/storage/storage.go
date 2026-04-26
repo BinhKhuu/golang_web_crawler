@@ -62,9 +62,9 @@ func (s *Service) StoreRawDataBatch(ctx context.Context, items []models.RawDataI
 		}
 	}()
 
-	if _, err := txn.ExecContext(ctx,
+	if _, ctxErr := txn.ExecContext(ctx,
 		`CREATE TEMP TABLE raw_data_batch (url TEXT, content_type TEXT, raw_content TEXT) ON COMMIT DROP`); err != nil {
-		return fmt.Errorf("creating temp table: %w", err)
+		return fmt.Errorf("creating temp table: %w", ctxErr)
 	}
 
 	stmt, err := txn.PrepareContext(ctx, pq.CopyIn("raw_data_batch",
@@ -72,17 +72,17 @@ func (s *Service) StoreRawDataBatch(ctx context.Context, items []models.RawDataI
 	if err != nil {
 		return fmt.Errorf("preparing copy statement: %w", err)
 	}
+	defer func() {
+		if closeErr := stmt.Close(); err != nil {
+			s.logger.Error("finishing copy:", "error", closeErr)
+		}
+	}()
 
 	for _, item := range items {
 		_, err = stmt.ExecContext(ctx, item.URL, item.ContentType, item.RawContent)
 		if err != nil {
-			stmt.Close()
 			return fmt.Errorf("executing copy for %s: %w", item.URL, err)
 		}
-	}
-
-	if err := stmt.Close(); err != nil {
-		return fmt.Errorf("finishing copy: %w", err)
 	}
 
 	if _, err := txn.ExecContext(ctx,
