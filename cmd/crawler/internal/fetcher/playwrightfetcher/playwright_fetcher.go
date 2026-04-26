@@ -264,7 +264,7 @@ func (f *PlaywrightFetcher) waitAndCollectResults(ctx context.Context, p playwri
 }
 
 func waitForElementVisibility(f *PlaywrightFetcher, p playwright.Page, sel string) error {
-	timeout := float64(f.fetchConfig.Timeout) //nolint:staticcheck
+	timeout := float64(f.fetchConfig.Timeout)
 	locator := p.Locator(sel)
 	err := locator.First().WaitFor(playwright.LocatorWaitForOptions{
 		State:   playwright.WaitForSelectorStateVisible,

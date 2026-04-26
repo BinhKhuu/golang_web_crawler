@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
 	"errors"
 	"fmt"
 	"golangwebcrawler/internal/models"
@@ -13,7 +14,10 @@ import (
 	"github.com/lib/pq"
 )
 
-const queryTimeout = 5 * time.Second
+const (
+	queryTimeout      = 5 * time.Second
+	batchQueryTimeout = 60 * time.Second
+)
 
 type Service struct {
 	db     *sql.DB
@@ -47,7 +51,7 @@ func (s *Service) StoreRawDataBatch(ctx context.Context, items []models.RawDataI
 		return nil
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
+	ctx, cancel := context.WithTimeout(ctx, batchQueryTimeout)
 	defer cancel()
 
 	txn, err := s.db.BeginTx(ctx, nil)
@@ -57,13 +61,13 @@ func (s *Service) StoreRawDataBatch(ctx context.Context, items []models.RawDataI
 
 	defer func() {
 		rollbackErr := txn.Rollback()
-		if rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) {
+		if rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) && !errors.Is(rollbackErr, driver.ErrBadConn) {
 			s.logger.Error("failed to rollback transaction", "error", rollbackErr)
 		}
 	}()
 
 	if _, ctxErr := txn.ExecContext(ctx,
-		`CREATE TEMP TABLE raw_data_batch (url TEXT, content_type TEXT, raw_content TEXT) ON COMMIT DROP`); err != nil {
+		`CREATE TEMP TABLE raw_data_batch (url TEXT, content_type TEXT, raw_content TEXT) ON COMMIT DROP`); ctxErr != nil {
 		return fmt.Errorf("creating temp table: %w", ctxErr)
 	}
 
@@ -73,7 +77,7 @@ func (s *Service) StoreRawDataBatch(ctx context.Context, items []models.RawDataI
 		return fmt.Errorf("preparing copy statement: %w", err)
 	}
 	defer func() {
-		if closeErr := stmt.Close(); err != nil {
+		if closeErr := stmt.Close(); closeErr != nil {
 			s.logger.Error("finishing copy:", "error", closeErr)
 		}
 	}()
@@ -83,6 +87,11 @@ func (s *Service) StoreRawDataBatch(ctx context.Context, items []models.RawDataI
 		if err != nil {
 			return fmt.Errorf("executing copy for %s: %w", item.URL, err)
 		}
+	}
+
+	// Finalize the COPY stream before issuing further SQL on this transaction.
+	if _, err = stmt.Exec(); err != nil {
+		return fmt.Errorf("flushing copy statement: %w", err)
 	}
 
 	if _, err := txn.ExecContext(ctx,
@@ -150,7 +159,7 @@ func (s *Service) StoreExtractedJobDataBatchUpSert(ctx context.Context, results 
 		return nil
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
+	ctx, cancel := context.WithTimeout(ctx, batchQueryTimeout)
 	defer cancel()
 
 	txn, err := s.db.BeginTx(ctx, nil)
@@ -160,7 +169,7 @@ func (s *Service) StoreExtractedJobDataBatchUpSert(ctx context.Context, results 
 
 	defer func() {
 		rollbackErr := txn.Rollback()
-		if rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) {
+		if rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) && !errors.Is(rollbackErr, driver.ErrBadConn) {
 			s.logger.Error("failed to rollback transaction", "error", rollbackErr)
 		}
 	}()
@@ -212,7 +221,7 @@ func (s *Service) StoreExtractedJobDataBatch(ctx context.Context, results []Extr
 		return nil
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
+	ctx, cancel := context.WithTimeout(ctx, batchQueryTimeout)
 	defer cancel()
 
 	txn, err := s.db.BeginTx(ctx, nil)
@@ -221,7 +230,7 @@ func (s *Service) StoreExtractedJobDataBatch(ctx context.Context, results []Extr
 	}
 	defer func() {
 		rollbackErr := txn.Rollback()
-		if rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) {
+		if rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) && !errors.Is(rollbackErr, driver.ErrBadConn) {
 			s.logger.Error("failed to rollback transaction", "error", rollbackErr)
 		}
 	}()

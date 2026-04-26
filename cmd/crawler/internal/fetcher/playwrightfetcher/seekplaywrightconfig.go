@@ -5,7 +5,7 @@ func GetSeekConfiguration() PlaywrightFetcherConfig {
 		// Target
 		URL:      "https://www.seek.com.au/software-engineer-jobs",
 		Headless: true,
-		Timeout:  10000,
+		Timeout:  defaultTimeout,
 
 		// Search interaction: fill input, submit, then wait for results
 		Search: SearchConfig{
