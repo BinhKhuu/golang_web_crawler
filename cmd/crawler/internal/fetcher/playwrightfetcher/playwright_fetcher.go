@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"math/rand"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -30,28 +31,38 @@ type PlaywrightFetcher struct {
 	fetchFn     func(ctx context.Context, url string) ([]crawler.FetchResult, error)
 }
 
-/*
-PlaywrightFetcherConfig
-Leave query and selectors empty to skip the step.
+// SearchConfig holds selectors and query for the search interaction.
+// Leave fields empty to skip the step. The first matching selector is used.
+type SearchConfig struct {
+	InputSelectors  []string `json:"inputSelectors"`
+	Query           string   `json:"query"`
+	SubmitSelectors []string `json:"submitSelectors"`
+}
 
-the first matching selector is used for each of the following steps:
-SearchInputSelectors
-SearchQuery
-SearchSubmitSelectors
-ResultsSelectors
+// ResultsConfig holds selectors for collecting results after search.
+// ListingSelectors: first match is used to locate job listing links.
+// DataSelectors: all matches are used to extract content after clicking a listing.
+type ResultsConfig struct {
+	ListingSelectors []string `json:"listingSelectors"`
+	DataSelectors    []string `json:"dataSelectors"`
+}
 
-matches multiple selectors storing results
-DataSelectors.
-*/
+// CanonicalizationConfig controls how fetched URLs are normalized for deduplication.
+type CanonicalizationConfig struct {
+	// IgnoreQueryParams strips these query parameters (e.g. tracking params like "ref", "sol").
+	IgnoreQueryParams []string `json:"ignoreQueryParams"`
+	// RootRelativePrefixes treats hrefs starting with these prefixes as root-relative (e.g. "job/" → "/job/").
+	RootRelativePrefixes []string `json:"rootRelativePrefixes"`
+}
+
 type PlaywrightFetcherConfig struct {
-	URL                   string   `json:"url"`
-	Headless              bool     `json:"headless"`
-	SearchInputSelectors  []string `json:"searchInputSelectors"`
-	SearchQuery           string   `json:"searchQuery"`
-	SearchSubmitSelectors []string `json:"searchSubmitSelectors"`
-	ResultsSelectors      []string `json:"resultsSelectors"`
-	DataSelectors         []string `json:"dataSelectors"`
-	Timeout               int      `json:"timeout"`
+	URL      string `json:"url"`
+	Headless bool   `json:"headless"`
+	Timeout  int    `json:"timeout"`
+
+	Search           SearchConfig           `json:"search"`
+	Results          ResultsConfig          `json:"results"`
+	Canonicalization CanonicalizationConfig `json:"canonicalization"`
 }
 
 func NewPlaywrightFetcher(logger *slog.Logger, fetchConfig *PlaywrightFetcherConfig) (*PlaywrightFetcher, error) {
@@ -223,8 +234,8 @@ func (f *PlaywrightFetcher) Close() error {
 // waitAndCollectResults stops on first matching selector.
 func (f *PlaywrightFetcher) waitAndCollectResults(ctx context.Context, p playwright.Page) ([]crawler.FetchResult, error) {
 	var results []crawler.FetchResult
-	if len(f.fetchConfig.ResultsSelectors) > 0 {
-		for _, sel := range f.fetchConfig.ResultsSelectors {
+	if len(f.fetchConfig.Results.ListingSelectors) > 0 {
+		for _, sel := range f.fetchConfig.Results.ListingSelectors {
 			if err := ctx.Err(); err != nil {
 				return results, err
 			}
@@ -253,7 +264,7 @@ func (f *PlaywrightFetcher) waitAndCollectResults(ctx context.Context, p playwri
 }
 
 func waitForElementVisibility(f *PlaywrightFetcher, p playwright.Page, sel string) error {
-	timeout := float64(f.fetchConfig.Timeout)
+	timeout := float64(f.fetchConfig.Timeout) //nolint:staticcheck
 	locator := p.Locator(sel)
 	err := locator.First().WaitFor(playwright.LocatorWaitForOptions{
 		State:   playwright.WaitForSelectorStateVisible,
@@ -263,7 +274,7 @@ func waitForElementVisibility(f *PlaywrightFetcher, p playwright.Page, sel strin
 }
 
 func (f *PlaywrightFetcher) fetchSPAConfigClickAction(ctx context.Context, entry playwright.Locator, p playwright.Page) ([]crawler.FetchResult, error) {
-	id := createFetchId(entry, p)
+	id := f.createFetchID(entry, p)
 	err := entry.Click()
 	if err != nil {
 		f.logger.Error("error clicking entry", "error", err)
@@ -282,13 +293,25 @@ func (f *PlaywrightFetcher) fetchSPAConfigClickAction(ctx context.Context, entry
 	return r, nil
 }
 
-// todo ID for fetched data in generation have a few selectors to look for when generating the id in playwrightfetcher.
-func createFetchId(entry playwright.Locator, p playwright.Page) string {
+func (f *PlaywrightFetcher) createFetchID(entry playwright.Locator, p playwright.Page) string {
 	href, err := entry.GetAttribute("href")
-	if err != nil {
-		href = p.URL() + uuid.New().String() // fallback to current page URL if href is not available
+	if err != nil || strings.TrimSpace(href) == "" {
+		return p.URL() + uuid.New().String()
 	}
-	return href
+
+	ignoreQueryParams := []string(nil)
+	rootRelativePrefixes := []string(nil)
+	if f.fetchConfig != nil {
+		ignoreQueryParams = f.fetchConfig.Canonicalization.IgnoreQueryParams
+		rootRelativePrefixes = f.fetchConfig.Canonicalization.RootRelativePrefixes
+	}
+
+	canonical := canonicalizeFetchedURL(p.URL(), href, ignoreQueryParams, rootRelativePrefixes)
+	if canonical == "" {
+		return p.URL() + uuid.New().String()
+	}
+
+	return canonical
 }
 
 // submitSearch stops on the first matching selector.
@@ -297,8 +320,8 @@ func (f *PlaywrightFetcher) submitSearch(ctx context.Context, p playwright.Page)
 		return err
 	}
 
-	if len(f.fetchConfig.SearchSubmitSelectors) > 0 {
-		for _, btn := range f.fetchConfig.SearchSubmitSelectors {
+	if len(f.fetchConfig.Search.SubmitSelectors) > 0 {
+		for _, btn := range f.fetchConfig.Search.SubmitSelectors {
 			if err := ctx.Err(); err != nil {
 				return err
 			}
@@ -319,13 +342,13 @@ func (f *PlaywrightFetcher) fillSearchInput(ctx context.Context, p playwright.Pa
 		return err
 	}
 
-	if len(f.fetchConfig.SearchInputSelectors) > 0 {
-		for _, sel := range f.fetchConfig.SearchInputSelectors {
+	if len(f.fetchConfig.Search.InputSelectors) > 0 {
+		for _, sel := range f.fetchConfig.Search.InputSelectors {
 			if err := ctx.Err(); err != nil {
 				return err
 			}
 
-			err := p.Locator(sel).Fill(f.fetchConfig.SearchQuery)
+			err := p.Locator(sel).Fill(f.fetchConfig.Search.Query)
 			if err == nil {
 				break
 			}
@@ -339,8 +362,8 @@ func (f *PlaywrightFetcher) fillSearchInput(ctx context.Context, p playwright.Pa
 // attempting to locate and extract text content from elements matching those selectors on the current page.
 func (f *PlaywrightFetcher) fetchSPAConfigDataSelectors(ctx context.Context, p playwright.Page, id string) ([]crawler.FetchResult, error) {
 	var results []crawler.FetchResult
-	if len(f.fetchConfig.DataSelectors) > 0 {
-		for _, sel := range f.fetchConfig.DataSelectors {
+	if len(f.fetchConfig.Results.DataSelectors) > 0 {
+		for _, sel := range f.fetchConfig.Results.DataSelectors {
 			if err := ctx.Err(); err != nil {
 				return results, err
 			}
@@ -460,26 +483,34 @@ func DefaultConfig() PlaywrightFetcherConfig {
 	return PlaywrightFetcherConfig{
 		URL:      "https://www.seek.com.au",
 		Headless: true,
-		SearchInputSelectors: []string{
-			"input[name=keywords]",
-			"input[placeholder*='Search']",
+		Timeout:  defaultTimeout,
+		Search: SearchConfig{
+			InputSelectors: []string{
+				"input[name=keywords]",
+				"input[placeholder*='Search']",
+			},
+			Query: "Software Engineer Jobs",
+			SubmitSelectors: []string{
+				"button[type=submit]",
+				"button[aria-label='Search']",
+			},
 		},
-		SearchQuery: "Software Engineer Jobs",
-		SearchSubmitSelectors: []string{
-			"button[type=submit]",
-			"button[aria-label='Search']",
+		Results: ResultsConfig{
+			ListingSelectors: []string{
+				"a[data-automation='jobTitle']",
+				"a.job-link",
+				"a[data-testid='job-result']",
+			},
+			DataSelectors: []string{
+				"a[id*='job-title']",
+				"a[data-automation='jobTitle']",
+				".job-title a",
+				"article a[href*='/job/']",
+			},
 		},
-		ResultsSelectors: []string{
-			"a[data-automation='jobTitle']",
-			"a.job-link",
-			"a[data-testid='job-result']",
+		Canonicalization: CanonicalizationConfig{
+			IgnoreQueryParams:    []string{"sol", "ref", "origin"},
+			RootRelativePrefixes: []string{"job/"},
 		},
-		DataSelectors: []string{
-			"a[id*='job-title']",
-			"a[data-automation='jobTitle']",
-			".job-title a",
-			"article a[href*='/job/']",
-		},
-		Timeout: defaultTimeout,
 	}
 }

@@ -261,8 +261,8 @@ func Test_WaitAndCollectResults_AndfetchSPAConfigDataSelectors(t *testing.T) {
 			ts := createTestHttpServer(tt.html)
 
 			f := createMockFetcher()
-			f.fetchConfig.ResultsSelectors = tt.resultsSelectors
-			f.fetchConfig.DataSelectors = tt.dataSelectors
+			f.fetchConfig.Results.ListingSelectors = tt.resultsSelectors
+			f.fetchConfig.Results.DataSelectors = tt.dataSelectors
 			f.fetchConfig.Timeout = defaultTimeout
 
 			err := f.configurePlaywrightBrowser()
@@ -300,4 +300,60 @@ func createTestHttpServer(html string) *httptest.Server {
 		fmt.Fprint(w, html)
 	}))
 	return ts
+}
+
+func Test_CanonicalizeFetchedURL(t *testing.T) {
+	tc := []struct {
+		name              string
+		baseURL           string
+		href              string
+		ignoreQueryParams []string
+		rootPrefixes      []string
+		expected          string
+	}{
+		{
+			name:    "removes fragment and ignored params",
+			baseURL: "https://www.seek.com.au/software-engineer-jobs",
+			href:    "/job/91318081?type=standard&ref=search-standalone&origin=cardTitle#sol=2ecb52bdcb0bfb96f8160ca64024c28215a0a063",
+			ignoreQueryParams: []string{
+				"sol",
+				"ref",
+				"origin",
+			},
+			expected: "https://www.seek.com.au/job/91318081?type=standard",
+		},
+		{
+			name:    "treats configured bare prefix as root-relative",
+			baseURL: "https://www.seek.com.au/software-engineer-jobs/in-All-Australia",
+			href:    "job/91318081?type=standard&ref=search-standalone&origin=cardTitle#sol=383e9b9d93f39fc67d84d3223d264c7c94ae6961",
+			ignoreQueryParams: []string{
+				"sol",
+				"ref",
+				"origin",
+			},
+			rootPrefixes: []string{"job/"},
+			expected:     "https://www.seek.com.au/job/91318081?type=standard",
+		},
+		{
+			name:     "strips utm params generically",
+			baseURL:  "https://example.com/jobs",
+			href:     "https://example.com/job/1?utm_source=x&utm_medium=y&id=1#abc",
+			expected: "https://example.com/job/1?id=1",
+		},
+		{
+			name:     "resolves relative links",
+			baseURL:  "https://example.com/jobs/search",
+			href:     "../job/100?foo=bar#frag",
+			expected: "https://example.com/job/100?foo=bar",
+		},
+	}
+
+	for _, tt := range tc {
+		t.Run(tt.name, func(t *testing.T) {
+			got := canonicalizeFetchedURL(tt.baseURL, tt.href, tt.ignoreQueryParams, tt.rootPrefixes)
+			if got != tt.expected {
+				t.Fatalf("expected %s, got %s", tt.expected, got)
+			}
+		})
+	}
 }
