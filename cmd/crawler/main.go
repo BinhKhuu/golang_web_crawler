@@ -34,7 +34,7 @@ const (
 func main() {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 
-	cfg, err := Load("../../.env")
+	cfg, err := Load(".env")
 	if err != nil {
 		logger.Error("Error loading .env file", "error", err)
 		return

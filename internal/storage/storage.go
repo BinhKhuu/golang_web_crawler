@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
 	"errors"
 	"fmt"
 	"golangwebcrawler/internal/models"
@@ -13,7 +14,10 @@ import (
 	"github.com/lib/pq"
 )
 
-const queryTimeout = 5 * time.Second
+const (
+	queryTimeout      = 5 * time.Second
+	batchQueryTimeout = 60 * time.Second
+)
 
 type Service struct {
 	db     *sql.DB
@@ -47,7 +51,7 @@ func (s *Service) StoreRawDataBatch(ctx context.Context, items []models.RawDataI
 		return nil
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
+	ctx, cancel := context.WithTimeout(ctx, batchQueryTimeout)
 	defer cancel()
 
 	txn, err := s.db.BeginTx(ctx, nil)
@@ -57,29 +61,46 @@ func (s *Service) StoreRawDataBatch(ctx context.Context, items []models.RawDataI
 
 	defer func() {
 		rollbackErr := txn.Rollback()
-		if rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) {
+		if rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) && !errors.Is(rollbackErr, driver.ErrBadConn) {
 			s.logger.Error("failed to rollback transaction", "error", rollbackErr)
 		}
 	}()
 
-	query := `
-		INSERT INTO raw_data (url, content_type, raw_content)
-		VALUES ($1, $2, $3)
-		ON CONFLICT (url)
-		DO UPDATE SET content_type = EXCLUDED.content_type, raw_content = EXCLUDED.raw_content, fetched_at = NOW();
-	`
-
-	stmt, err := txn.PrepareContext(ctx, query)
-	if err != nil {
-		return fmt.Errorf("preparing statement: %w", err)
+	if _, ctxErr := txn.ExecContext(ctx,
+		`CREATE TEMP TABLE raw_data_batch (url TEXT, content_type TEXT, raw_content TEXT) ON COMMIT DROP`); ctxErr != nil {
+		return fmt.Errorf("creating temp table: %w", ctxErr)
 	}
-	defer stmt.Close()
+
+	stmt, err := txn.PrepareContext(ctx, pq.CopyIn("raw_data_batch",
+		"url", "content_type", "raw_content"))
+	if err != nil {
+		return fmt.Errorf("preparing copy statement: %w", err)
+	}
+	defer func() {
+		if closeErr := stmt.Close(); closeErr != nil {
+			s.logger.Error("finishing copy:", "error", closeErr)
+		}
+	}()
 
 	for _, item := range items {
 		_, err = stmt.ExecContext(ctx, item.URL, item.ContentType, item.RawContent)
 		if err != nil {
-			return fmt.Errorf("executing statement for %s: %w", item.URL, err)
+			return fmt.Errorf("executing copy for %s: %w", item.URL, err)
 		}
+	}
+
+	if _, err = stmt.ExecContext(ctx); err != nil {
+		return fmt.Errorf("flushing copy statement: %w", err)
+	}
+
+	if _, err := txn.ExecContext(ctx,
+		`INSERT INTO raw_data (url, content_type, raw_content)
+		SELECT url, content_type, raw_content FROM raw_data_batch
+		ON CONFLICT (url)
+		DO UPDATE SET content_type = EXCLUDED.content_type,
+		              raw_content = EXCLUDED.raw_content,
+		              fetched_at = NOW()`); err != nil {
+		return fmt.Errorf("upserting from temp table: %w", err)
 	}
 
 	if err := txn.Commit(); err != nil {
@@ -137,7 +158,7 @@ func (s *Service) StoreExtractedJobDataBatchUpSert(ctx context.Context, results 
 		return nil
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
+	ctx, cancel := context.WithTimeout(ctx, batchQueryTimeout)
 	defer cancel()
 
 	txn, err := s.db.BeginTx(ctx, nil)
@@ -147,7 +168,7 @@ func (s *Service) StoreExtractedJobDataBatchUpSert(ctx context.Context, results 
 
 	defer func() {
 		rollbackErr := txn.Rollback()
-		if rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) {
+		if rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) && !errors.Is(rollbackErr, driver.ErrBadConn) {
 			s.logger.Error("failed to rollback transaction", "error", rollbackErr)
 		}
 	}()
@@ -199,7 +220,7 @@ func (s *Service) StoreExtractedJobDataBatch(ctx context.Context, results []Extr
 		return nil
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
+	ctx, cancel := context.WithTimeout(ctx, batchQueryTimeout)
 	defer cancel()
 
 	txn, err := s.db.BeginTx(ctx, nil)
@@ -208,7 +229,7 @@ func (s *Service) StoreExtractedJobDataBatch(ctx context.Context, results []Extr
 	}
 	defer func() {
 		rollbackErr := txn.Rollback()
-		if rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) {
+		if rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) && !errors.Is(rollbackErr, driver.ErrBadConn) {
 			s.logger.Error("failed to rollback transaction", "error", rollbackErr)
 		}
 	}()

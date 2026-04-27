@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
 	"errors"
 	"golangwebcrawler/internal/dbstore"
 	"golangwebcrawler/internal/models"
@@ -68,7 +69,7 @@ func (s *ParserStorageService) StoreExtractedJobDataBatchUpSert(ctx context.Cont
 		return nil
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, dbstore.QueryTimeout)
+	ctx, cancel := context.WithTimeout(ctx, dbstore.BatchQueryTimeout)
 	defer cancel()
 
 	txn, err := s.db.BeginTx(ctx, nil)
@@ -78,7 +79,7 @@ func (s *ParserStorageService) StoreExtractedJobDataBatchUpSert(ctx context.Cont
 
 	defer func() {
 		rollbackErr := txn.Rollback()
-		if rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) {
+		if rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) && !errors.Is(rollbackErr, driver.ErrBadConn) {
 			s.logger.Error("Failed to rollback transaction", "error", rollbackErr)
 		}
 	}()
@@ -127,7 +128,7 @@ func (s *ParserStorageService) StoreExtractedJobDataBatch(ctx context.Context, r
 		return nil
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, dbstore.QueryTimeout)
+	ctx, cancel := context.WithTimeout(ctx, dbstore.BatchQueryTimeout)
 	defer cancel()
 
 	txn, err := s.db.BeginTx(ctx, nil)
@@ -136,7 +137,7 @@ func (s *ParserStorageService) StoreExtractedJobDataBatch(ctx context.Context, r
 	}
 	defer func() {
 		rollbackErr := txn.Rollback()
-		if rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) {
+		if rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) && !errors.Is(rollbackErr, driver.ErrBadConn) {
 			s.logger.Error("Failed to rollback transaction", "error", rollbackErr)
 		}
 	}()
