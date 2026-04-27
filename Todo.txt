@@ -31,12 +31,6 @@ todo:
 
             err = c.Crawl(ctx, "https://example.com", f, p, storageSvc, defaultConcurrency)
 
-    1. Parser Design 
-        1. Parser needs to expect a model raw which has the domain website, use this to map the origin to the links for each job
-        1. figure out what the model for extract_jobdata should look like and how to map it to joblisting if needed 
-            what is joblisting model used for? should joblisting be the thing thats stored and extract_data be the thing that transform into joblisting
-        1. make sure pipelines don't run LLM for testing
-
     2. Cralwer Design
         2. Update Crawler main to accept CMD flags (use go flags similar to what was done in swagger) allow crawler config to be the options set 
             - allow fetcher type to be set through cmd parameters
