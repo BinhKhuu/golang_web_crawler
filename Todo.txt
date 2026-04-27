@@ -1,5 +1,5 @@
 todo: 
-
+    1. add migrations test back to storage service
     1. StorageService Batch is not actually batch but many inserts in a loop look for a way to insert batch
     1. Orchestrator create one that schedules the crawls and db saves.
 

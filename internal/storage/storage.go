@@ -89,8 +89,7 @@ func (s *Service) StoreRawDataBatch(ctx context.Context, items []models.RawDataI
 		}
 	}
 
-	// Finalize the COPY stream before issuing further SQL on this transaction.
-	if _, err = stmt.Exec(); err != nil {
+	if _, err = stmt.ExecContext(ctx); err != nil {
 		return fmt.Errorf("flushing copy statement: %w", err)
 	}
 

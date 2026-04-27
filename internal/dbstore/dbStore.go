@@ -23,8 +23,10 @@ const (
 	defaultMaxDepth         = 3
 )
 
-const QueryTimeout = 5 * time.Second
-const BatchQueryTimeout = 60 * time.Second
+const (
+	QueryTimeout      = 5 * time.Second
+	BatchQueryTimeout = 60 * time.Second
+)
 
 type DBStorageService struct {
 	DB *sql.DB
