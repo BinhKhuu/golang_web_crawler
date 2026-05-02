@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"golangwebcrawler/cmd/crawler/internal/crawler"
+	"golangwebcrawler/internal/crawler"
 	"log/slog"
 	"math/rand"
 	"net/http"

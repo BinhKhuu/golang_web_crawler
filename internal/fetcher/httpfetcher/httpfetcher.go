@@ -3,7 +3,7 @@ package httpfetcher
 import (
 	"context"
 	"fmt"
-	"golangwebcrawler/cmd/crawler/internal/crawler"
+	"golangwebcrawler/internal/crawler"
 	"io"
 	"net/http"
 )

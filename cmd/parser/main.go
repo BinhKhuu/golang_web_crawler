@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"golangwebcrawler/cmd/parser/internal/parser"
+	"golangwebcrawler/internal/parser"
 	"golangwebcrawler/internal/dbstore"
 	"golangwebcrawler/internal/models"
 	"golangwebcrawler/internal/storage"
