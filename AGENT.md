@@ -1,33 +1,30 @@
-# Feature: [Feature Name] - Agent Blueprint
+# Agent Instructions
 
-## 1. Context & Objective
-- **Goal**: Orchestrator interacts with the crawler and the parser to schedule the crawling and parsing process. each crawl and parse is a type of job that targets a specific type of data or website.
-- **User Story**: As a user, I want to call the orchestrator to schedule a crawl and parse job, so that the data is stored in the database and can be accessed later on.
-- **Priority**: High
+## Before Starting Any Task
 
-## 2. Technical Environment
-- **Stack**: golang
-- **Key Files**: 
-  - Source: `cmd/scheduler`
-  - Data: `internal/models`, `cmd/crawler/internal/models`, `cmd/parser/internal/models`
-- **Constraints**: use golang, `golangci-lint` to check code style, any changes to crawler or parser must pass all tests.
+1. **Read `README.md`** — it contains the project overview, required tools, environment setup, database configuration, and how to run the application.
+2. **Read any relevant documentation** in the project root: `MIGRATIONS.md`, `OLLAMA.md`, `DOCKER.md`, `TESTING.md`.
+3. **Scan the codebase** to understand current structure before making changes.
 
-## 3. Implementation Plan
-### Phase 1: Orchestrator Crawler
-- [ ] schedule a crawl for `seek.com.au` using playwrightfetcher functionality should describe what its doing, pattern should allow extension (other crawl types)
-- [ ] Write unit tests for logic.
+## Project Context (from README.md)
 
-### Phase 2: Orchestrator Parser
-- [ ] schedule a parse on crawled data, pattern should allow extension (other parse types). 
-- [ ] allow crawler and parser to run in any order (sequential, concurrent, independently, etc.)
-- [ ] Wrie unit test for logic.
+- **What**: A Go web crawler with scheduler, parser, and LLM-based job data extraction.
+- **Stack**: Go 1.25+, PostgreSQL, Playwright (headless browser), Ollama (LLM).
+- **Entry points**: `cmd/scheduler` (main orchestrator), `cmd/parser` (standalone parser CLI), `cmd/api` (stub).
+- **Run**: `go run cmd/scheduler/main.go` after setting up DB and migrations.
+- **DB**: PostgreSQL via Docker at `localhost:5433`, database name `jobs_webcrawler`.
+- **LLM model**: Configured in `internal/llm/llm.go` (default: `mistral:latest`).
 
-## 4. Success Criteria (Verification)
-- [ ] Schedule a crawl and parse to site sucessfully
-- [ ] schedule a parse and crawl to site sucessfully
-- [ ] schedule a parse and crawl to site in parallel
+## Coding Standards
 
-## 5. Agent Instructions
-- **Coding Style**: `golangci-lint` to check code style
-- **Safety**: `golangci-lint` to check code style, do not change .env settings unless adding new settings for new unit tests
-- **Reporting**: Provide a summary of modified files after each task completion.
+- Run `golangci-lint run ./...` before finishing — all lint checks must pass.
+- Run `go test ./...` — all tests must pass.
+- Use `atomic.Int32` instead of `int32` + manual atomic functions.
+- Extract repeated string literals into constants (goconst).
+- Format imports with standard library, then third-party, then local packages.
+
+## Constraints
+
+- Do not change `.env` settings unless required for new unit tests.
+- Changes to crawler/parser logic must pass all existing tests.
+- Do not couple scheduler to command-private packages under `cmd/*/internal`.
