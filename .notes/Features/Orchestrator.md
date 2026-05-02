@@ -10,7 +10,7 @@
 - Key Files:
   - Scheduler orchestration: [cmd/scheduler](cmd/scheduler)
   - Shared reusable crawl and parse libraries: [internal](internal)
-  - Command entrypoints (thin wiring only): [cmd/parser/main.go](cmd/parser/main.go), [cmd/scheduler/main.go](cmd/scheduler/main.go)
+  - Command entrypoints (thin wiring only): [cmd/scheduler/main.go](cmd/scheduler/main.go)
   - Shared models and storage: [internal/models](internal/models), [internal/storage/storage.go](internal/storage/storage.go)
 - Constraints:
   - Use golang
@@ -21,7 +21,7 @@
 ## 3. Implementation Plan
 ### Phase 0: Architecture Refactor for Reuse
 - [ ] Crawler logic is already in shared `internal/crawler` package (cmd/crawler removed).
-- [ ] Extract reusable parser logic from cmd/parser/internal into shared root internal packages.
+- [ ] Parser logic is already in shared `internal/parser` package (cmd/parser removed).
 - [ ] Keep command mains as thin composition layers.
 - [ ] Ensure scheduler imports only shared packages/interfaces, not cmd/*/internal.
 
@@ -48,7 +48,7 @@
 - [ ] Schedule parse and crawl successfully.
 - [ ] Schedule parse and crawl in parallel successfully.
 - [ ] Scheduler uses shared root internal packages and does not import cmd/*/internal.
-  - [ ] Existing parser/scheduler command entrypoints remain functional.
+  - [ ] Existing scheduler command entrypoint remains functional.
 - [ ] All related tests and lint checks pass.
 
 ## 5. Agent Instructions

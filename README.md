@@ -185,11 +185,11 @@ Create a `.vscode/launch.json` file in the project root with the following confi
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Debug Parser",
+            "name": "Debug Scheduler",
             "type": "go",
             "request": "launch",
             "mode": "debug",
-            "program": "${workspaceFolder}/cmd/parser",
+            "program": "${workspaceFolder}/cmd/scheduler",
             "envFile": "${workspaceFolder}/.env",
             "args": [],
             "showLog": true
