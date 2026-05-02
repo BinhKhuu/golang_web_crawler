@@ -1,4 +1,5 @@
 todo: 
+    1. Parse data does not store the parse data need to update to AFTER reviewing the code to store the data
     1. Orchestrator create one that schedules the crawls and db saves.
 
     1. Playwright fetcher  
