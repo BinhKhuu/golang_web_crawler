@@ -11,10 +11,15 @@ import (
 	"time"
 )
 
+const (
+	crawlLabel = "crawl"
+	parseLabel = "parse"
+)
+
 type mockJob struct {
 	jobType job.JobType
 	execute func(ctx context.Context) error
-	called  int32
+	called  atomic.Int32
 }
 
 func (m *mockJob) Type() job.JobType {
@@ -22,7 +27,7 @@ func (m *mockJob) Type() job.JobType {
 }
 
 func (m *mockJob) Execute(ctx context.Context) error {
-	atomic.AddInt32(&m.called, 1)
+	m.called.Add(1)
 	if m.execute != nil {
 		return m.execute(ctx)
 	}
@@ -51,7 +56,7 @@ func TestOrchestrator_Sequential_Success(t *testing.T) {
 		jobType: job.Crawl,
 		execute: func(ctx context.Context) error {
 			mu.Lock()
-			order = append(order, "crawl")
+			order = append(order, crawlLabel)
 			mu.Unlock()
 			return nil
 		},
@@ -60,7 +65,7 @@ func TestOrchestrator_Sequential_Success(t *testing.T) {
 		jobType: job.Parse,
 		execute: func(ctx context.Context) error {
 			mu.Lock()
-			order = append(order, "parse")
+			order = append(order, parseLabel)
 			mu.Unlock()
 			return nil
 		},
@@ -74,7 +79,7 @@ func TestOrchestrator_Sequential_Success(t *testing.T) {
 	if len(order) != 2 {
 		t.Fatalf("expected 2 jobs to run, got %d", len(order))
 	}
-	if order[0] != "crawl" || order[1] != "parse" {
+	if order[0] != crawlLabel || order[1] != parseLabel {
 		t.Errorf("expected [crawl, parse], got %v", order)
 	}
 }
@@ -87,7 +92,7 @@ func TestOrchestrator_Sequential_ParseThenCrawl(t *testing.T) {
 		jobType: job.Parse,
 		execute: func(ctx context.Context) error {
 			mu.Lock()
-			order = append(order, "parse")
+			order = append(order, parseLabel)
 			mu.Unlock()
 			return nil
 		},
@@ -96,7 +101,7 @@ func TestOrchestrator_Sequential_ParseThenCrawl(t *testing.T) {
 		jobType: job.Crawl,
 		execute: func(ctx context.Context) error {
 			mu.Lock()
-			order = append(order, "crawl")
+			order = append(order, crawlLabel)
 			mu.Unlock()
 			return nil
 		},
@@ -110,7 +115,7 @@ func TestOrchestrator_Sequential_ParseThenCrawl(t *testing.T) {
 	if len(order) != 2 {
 		t.Fatalf("expected 2 jobs to run, got %d", len(order))
 	}
-	if order[0] != "parse" || order[1] != "crawl" {
+	if order[0] != parseLabel || order[1] != crawlLabel {
 		t.Errorf("expected [parse, crawl], got %v", order)
 	}
 }
@@ -133,7 +138,7 @@ func TestOrchestrator_Sequential_JobFailure(t *testing.T) {
 		t.Error("expected error, got nil")
 	}
 
-	if atomic.LoadInt32(&job2.called) != 0 {
+	if job2.called.Load() != 0 {
 		t.Error("second job should not have been called after first job failed")
 	}
 }
@@ -159,7 +164,7 @@ func TestOrchestrator_Concurrent_CrawlBeforeParse(t *testing.T) {
 		jobType: job.Crawl,
 		execute: func(ctx context.Context) error {
 			mu.Lock()
-			order = append(order, "crawl")
+			order = append(order, crawlLabel)
 			mu.Unlock()
 			return nil
 		},
@@ -169,7 +174,7 @@ func TestOrchestrator_Concurrent_CrawlBeforeParse(t *testing.T) {
 		jobType: job.Parse,
 		execute: func(ctx context.Context) error {
 			mu.Lock()
-			order = append(order, "parse")
+			order = append(order, parseLabel)
 			mu.Unlock()
 			return nil
 		},
@@ -183,33 +188,33 @@ func TestOrchestrator_Concurrent_CrawlBeforeParse(t *testing.T) {
 	if len(order) != 2 {
 		t.Fatalf("expected 2 jobs to run, got %d", len(order))
 	}
-	if order[0] != "crawl" {
+	if order[0] != crawlLabel {
 		t.Errorf("crawl should complete first, got order %v", order)
 	}
 }
 
 func TestOrchestrator_Concurrent_MultipleCrawls(t *testing.T) {
-	var crawlCount int32
-	var parseCount int32
+	var crawlCount atomic.Int32
+	var parseCount atomic.Int32
 
 	crawl1 := &mockJob{
 		jobType: job.Crawl,
 		execute: func(ctx context.Context) error {
-			atomic.AddInt32(&crawlCount, 1)
+			crawlCount.Add(1)
 			return nil
 		},
 	}
 	crawl2 := &mockJob{
 		jobType: job.Crawl,
 		execute: func(ctx context.Context) error {
-			atomic.AddInt32(&crawlCount, 1)
+			crawlCount.Add(1)
 			return nil
 		},
 	}
 	parse1 := &mockJob{
 		jobType: job.Parse,
 		execute: func(ctx context.Context) error {
-			atomic.AddInt32(&parseCount, 1)
+			parseCount.Add(1)
 			return nil
 		},
 	}
@@ -219,11 +224,11 @@ func TestOrchestrator_Concurrent_MultipleCrawls(t *testing.T) {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if atomic.LoadInt32(&crawlCount) != 2 {
-		t.Errorf("expected 2 crawls, got %d", atomic.LoadInt32(&crawlCount))
+	if crawlCount.Load() != 2 {
+		t.Errorf("expected 2 crawls, got %d", crawlCount.Load())
 	}
-	if atomic.LoadInt32(&parseCount) != 1 {
-		t.Errorf("expected 1 parse, got %d", atomic.LoadInt32(&parseCount))
+	if parseCount.Load() != 1 {
+		t.Errorf("expected 1 parse, got %d", parseCount.Load())
 	}
 }
 
@@ -244,20 +249,20 @@ func TestOrchestrator_Concurrent_CrawlFailure(t *testing.T) {
 		t.Error("expected error, got nil")
 	}
 
-	if atomic.LoadInt32(&parseJob.called) != 0 {
+	if parseJob.called.Load() != 0 {
 		t.Error("parse job should not run when crawl fails")
 	}
 }
 
 func TestOrchestrator_Independent_AllRun(t *testing.T) {
-	var runCount int32
+	var runCount atomic.Int32
 
 	jobs := make([]job.Job, 3)
 	for i := range jobs {
 		jobs[i] = &mockJob{
 			jobType: job.Crawl,
 			execute: func(ctx context.Context) error {
-				atomic.AddInt32(&runCount, 1)
+				runCount.Add(1)
 				return nil
 			},
 		}
@@ -268,20 +273,20 @@ func TestOrchestrator_Independent_AllRun(t *testing.T) {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if atomic.LoadInt32(&runCount) != 3 {
-		t.Errorf("expected 3 jobs to run, got %d", atomic.LoadInt32(&runCount))
+	if runCount.Load() != 3 {
+		t.Errorf("expected 3 jobs to run, got %d", runCount.Load())
 	}
 }
 
 func TestOrchestrator_Independent_ContinuesOnError(t *testing.T) {
-	var runCount int32
+	var runCount atomic.Int32
 
 	jobs := make([]job.Job, 3)
 	for i := range jobs {
 		jobs[i] = &mockJob{
 			jobType: job.Crawl,
 			execute: func(ctx context.Context) error {
-				atomic.AddInt32(&runCount, 1)
+				runCount.Add(1)
 				return errors.New("job failed")
 			},
 		}
@@ -293,26 +298,26 @@ func TestOrchestrator_Independent_ContinuesOnError(t *testing.T) {
 		t.Error("expected error, got nil")
 	}
 
-	if atomic.LoadInt32(&runCount) != 3 {
-		t.Errorf("expected all 3 jobs to run despite errors, got %d", atomic.LoadInt32(&runCount))
+	if runCount.Load() != 3 {
+		t.Errorf("expected all 3 jobs to run despite errors, got %d", runCount.Load())
 	}
 }
 
 func TestOrchestrator_Independent_MixedJobs(t *testing.T) {
-	var crawlCount int32
-	var parseCount int32
+	var crawlCount atomic.Int32
+	var parseCount atomic.Int32
 
 	crawlJob := &mockJob{
 		jobType: job.Crawl,
 		execute: func(ctx context.Context) error {
-			atomic.AddInt32(&crawlCount, 1)
+			crawlCount.Add(1)
 			return nil
 		},
 	}
 	parseJob := &mockJob{
 		jobType: job.Parse,
 		execute: func(ctx context.Context) error {
-			atomic.AddInt32(&parseCount, 1)
+			parseCount.Add(1)
 			return nil
 		},
 	}
@@ -322,11 +327,11 @@ func TestOrchestrator_Independent_MixedJobs(t *testing.T) {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if atomic.LoadInt32(&crawlCount) != 1 {
-		t.Errorf("expected 1 crawl, got %d", atomic.LoadInt32(&crawlCount))
+	if crawlCount.Load() != 1 {
+		t.Errorf("expected 1 crawl, got %d", crawlCount.Load())
 	}
-	if atomic.LoadInt32(&parseCount) != 1 {
-		t.Errorf("expected 1 parse, got %d", atomic.LoadInt32(&parseCount))
+	if parseCount.Load() != 1 {
+		t.Errorf("expected 1 parse, got %d", parseCount.Load())
 	}
 }
 
@@ -338,11 +343,12 @@ func TestOrchestrator_EmptyJobs(t *testing.T) {
 }
 
 func TestOrchestrator_Sequential_SingleJob(t *testing.T) {
-	called := int32(0)
+	var called atomic.Int32
+	called.Store(0)
 	j := &mockJob{
 		jobType: job.Crawl,
 		execute: func(ctx context.Context) error {
-			atomic.AddInt32(&called, 1)
+			called.Add(1)
 			return nil
 		},
 	}
@@ -352,20 +358,20 @@ func TestOrchestrator_Sequential_SingleJob(t *testing.T) {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if atomic.LoadInt32(&called) != 1 {
-		t.Errorf("expected job to be called once, got %d", atomic.LoadInt32(&called))
+	if called.Load() != 1 {
+		t.Errorf("expected job to be called once, got %d", called.Load())
 	}
 }
 
 func TestOrchestrator_Concurrent_NoParseJobs(t *testing.T) {
-	var crawlCount int32
+	var crawlCount atomic.Int32
 
 	jobs := make([]job.Job, 2)
 	for i := range jobs {
 		jobs[i] = &mockJob{
 			jobType: job.Crawl,
 			execute: func(ctx context.Context) error {
-				atomic.AddInt32(&crawlCount, 1)
+				crawlCount.Add(1)
 				return nil
 			},
 		}
@@ -376,20 +382,20 @@ func TestOrchestrator_Concurrent_NoParseJobs(t *testing.T) {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if atomic.LoadInt32(&crawlCount) != 2 {
-		t.Errorf("expected 2 crawls, got %d", atomic.LoadInt32(&crawlCount))
+	if crawlCount.Load() != 2 {
+		t.Errorf("expected 2 crawls, got %d", crawlCount.Load())
 	}
 }
 
 func TestOrchestrator_Concurrent_NoCrawlJobs(t *testing.T) {
-	var parseCount int32
+	var parseCount atomic.Int32
 
 	jobs := make([]job.Job, 2)
 	for i := range jobs {
 		jobs[i] = &mockJob{
 			jobType: job.Parse,
 			execute: func(ctx context.Context) error {
-				atomic.AddInt32(&parseCount, 1)
+				parseCount.Add(1)
 				return nil
 			},
 		}
@@ -400,8 +406,8 @@ func TestOrchestrator_Concurrent_NoCrawlJobs(t *testing.T) {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if atomic.LoadInt32(&parseCount) != 2 {
-		t.Errorf("expected 2 parses, got %d", atomic.LoadInt32(&parseCount))
+	if parseCount.Load() != 2 {
+		t.Errorf("expected 2 parses, got %d", parseCount.Load())
 	}
 }
 
