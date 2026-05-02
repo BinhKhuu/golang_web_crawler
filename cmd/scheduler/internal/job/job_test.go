@@ -16,6 +16,7 @@ const (
 	testURL2   = "https://example.com/2"
 	testURL3   = "https://example.com/3"
 	testJobURL = "https://example.com/job"
+	testTitle  = "Job"
 )
 
 var (
@@ -254,7 +255,7 @@ func TestNewParseJob_BatchStorage(t *testing.T) {
 		ParserFn: func() (ParserJob, error) {
 			return &mockParser{
 				results: []models.ExtractedJobData{
-					{Title: "Job", Link: testJobURL},
+					{Title: testTitle, Link: testJobURL},
 				},
 			}, nil
 		},
@@ -277,8 +278,8 @@ func TestNewParseJob_ContextCancellation(t *testing.T) {
 
 	mockStor := &mockStorage{
 		rawData: []storage.RawData{
-			{URL: "https://example.com/1", RawContent: "html1"},
-			{URL: "https://example.com/2", RawContent: "html2"},
+			{URL: testURL1, RawContent: "html1"},
+			{URL: testURL2, RawContent: "html2"},
 		},
 	}
 
@@ -287,7 +288,7 @@ func TestNewParseJob_ContextCancellation(t *testing.T) {
 		ParserFn: func() (ParserJob, error) {
 			return &mockParser{
 				results: []models.ExtractedJobData{
-					{Title: "Job", Link: "https://example.com/job"},
+					{Title: testTitle, Link: testJobURL},
 				},
 			}, nil
 		},
@@ -307,9 +308,9 @@ func TestNewParseJob_ContextCancellation(t *testing.T) {
 func TestNewParseJob_ParseErrorContinues(t *testing.T) {
 	mockStor := &mockStorage{
 		rawData: []storage.RawData{
-			{URL: "https://example.com/1", RawContent: "valid"},
-			{URL: "https://example.com/2", RawContent: "invalid"},
-			{URL: "https://example.com/3", RawContent: "valid"},
+			{URL: testURL1, RawContent: "valid"},
+			{URL: testURL2, RawContent: "invalid"},
+			{URL: testURL3, RawContent: "valid"},
 		},
 	}
 
@@ -324,7 +325,7 @@ func TestNewParseJob_ParseErrorContinues(t *testing.T) {
 						return nil
 					}
 					return []models.ExtractedJobData{
-						{Title: "Job", Link: "https://example.com/job"},
+						{Title: testTitle, Link: testJobURL},
 					}
 				}(),
 				err: func() error {
