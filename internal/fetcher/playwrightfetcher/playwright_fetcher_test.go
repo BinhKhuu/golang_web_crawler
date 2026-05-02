@@ -18,7 +18,7 @@ import (
 var runFetchTest = false
 
 func TestMain(m *testing.M) {
-	if err := godotenv.Load("../../../../../.env"); err != nil {
+	if err := godotenv.Load("../../../.env"); err != nil {
 		log.Println("No .env file found, falling back to system env")
 	}
 	runFetchTest = os.Getenv("RUN_FETCH_TESTS") == "1"
@@ -27,7 +27,7 @@ func TestMain(m *testing.M) {
 
 func Test_FetchSPAConfig(t *testing.T) {
 	if !runFetchTest {
-		t.Skip("Skipping: set RUN_LLM_TESTS=1 to run")
+		t.Skip("Skipping: set RUN_FETCH_TESTS=1 to run")
 	}
 
 	ctx := context.Background()
@@ -58,7 +58,7 @@ func Test_FetchSPAConfig(t *testing.T) {
 
 func Test_FetchDefault(t *testing.T) {
 	if !runFetchTest {
-		t.Skip("Skipping: set RUN_LLM_TESTS=1 to run")
+		t.Skip("Skipping: set RUN_FETCH_TESTS=1 to run")
 	}
 	url := "https://www.seek.com.au/software-engineer-jobs"
 	ctx := context.Background()

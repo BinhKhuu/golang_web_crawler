@@ -1,42 +1,19 @@
 todo: 
-    1. Orchestrator create one that schedules the crawls and db saves.
-
+    1. Add note about saving everything in UTC - 0 so filters using time should use UTC - 0 not local time.
+    1. Delete raw data after parsed
+    1. Parse data does not store the parse data need to update to AFTER reviewing the code to store the data
     1. Playwright fetcher  
         - store fetched data to db
             - ID for fetched data in generation have a few selectors to look for when generating the id in playwrightfetcher
         - Investigate how to return network data 
         - add notes on play wright bot detection as readme
 
-        - Update Main to select the type of fetcher through configuration for Crawler 
-            - the fetcher type can be base on the Command coming in from terminal OR from api OR from enviroment what every is constructing the crawler
-            Config-driven via env
-
-            type CrawlerConfig struct {
-                DBHost         string
-                DBPort         string
-                MaxDepth       int
-                AllowedDomains []string
-                FetcherType    string // "http" | "playwright"
-            }
-
-            // factory constructor
-            var f crawler.Fetcher
-            switch cfg.FetcherType {
-            case "playwright":
-                pwConfig := playwrightfetcher.DefaultConfig()
-                f = playwrightfetcher.NewPlaywrightFetcher(logger, pwConfig)
-            default:
-                f = fetcher.NewHTTPFetcher(httpClient)
-            }
-
-            err = c.Crawl(ctx, "https://example.com", f, p, storageSvc, defaultConcurrency)
+    1. Scheduler turn into a CMD application with goflags 
+        - type of fetcher (playwrightfetcher or http) set through CMD flags
+        - allow specifing the .env file location through flags 
+            - .env will be the enviorment the fetcher will save to
 
     2. Cralwer Design
-        2. Update Crawler main to accept CMD flags (use go flags similar to what was done in swagger) allow crawler config to be the options set 
-            - allow fetcher type to be set through cmd parameters
-            - think about how the playwright fetcher configuration can be read and parsed from a file
-                - from cmd flags 
-                - from predefined configurations for some sites.
         2. Update crawler to get more speicified data or design a data splitter / organiser to validate the data before feeding it to the LLM for job Parsing
 
             Use Ollama in docker and parse html with the api.
@@ -57,10 +34,6 @@ todo:
                             1. navigate all the links with in the domain by finding the job links (go query or llm strategy)
 
             Crawler
-                - Using BrowserFetcher search for target 'job' then navigate to each link and save that data 
-                - rate limit and anti bot detection
-
-
                 1. Fetcher issue, The current HTTPFetcher uses a simple HTTP GET request which only retrieves the initial HTML. For Single Page Applications (SPAs), JavaScript needs to execute to render the full content. We need to use a headless browser approach.
                     Solution
                     Create a new BrowserFetcher that uses the chromedp package to launch a headless Chrome browser, wait for the page to fully load (including JS execution), then read the rendered HTML body.

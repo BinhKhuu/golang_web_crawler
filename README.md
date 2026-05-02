@@ -1,6 +1,6 @@
 # 🕷️ Golang Web Crawler
 
-A web crawler built with Go and React.
+A web crawler built with Go.
 
 ---
 
@@ -185,21 +185,11 @@ Create a `.vscode/launch.json` file in the project root with the following confi
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Debug Crawler",
+            "name": "Debug Scheduler",
             "type": "go",
             "request": "launch",
             "mode": "debug",
-            "program": "${workspaceFolder}/cmd/crawler",
-            "envFile": "${workspaceFolder}/.env",
-            "args": [],
-            "showLog": true
-        },
-        {
-            "name": "Debug Parser",
-            "type": "go",
-            "request": "launch",
-            "mode": "debug",
-            "program": "${workspaceFolder}/cmd/parser",
+            "program": "${workspaceFolder}/cmd/scheduler",
             "envFile": "${workspaceFolder}/.env",
             "args": [],
             "showLog": true
@@ -220,7 +210,7 @@ Create a `.vscode/launch.json` file in the project root with the following confi
 
 ### Using the Debug Profile
 
-1. Open the file you want to debug (e.g., `cmd/crawler/main.go`)
+1. Open the file you want to debug (e.g., `cmd/scheduler/main.go`)
 2. Set breakpoints by clicking on the line numbers
 3. Press `F5` or go to Run → Start Debugging
 4. Select the appropriate debug configuration from the dropdown
@@ -272,8 +262,8 @@ migrate -path infra/migrations/scripts \
 ### 5. Run the Application
 
 ```bash
-# Run the crawler
-go run cmd/crawler/main.go
+# Run the scheduler (orchestrates crawl + parse jobs)
+go run cmd/scheduler/main.go
 
 # Or use the debug profile in VS Code (see 🐛 Visual Studio Code Debug Setup)
 ```

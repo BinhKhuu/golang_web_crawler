@@ -111,10 +111,6 @@ linters:
       - path: _test.go
         linters:
           - unparam
-      - path: 'cmd/crawler/internal/models/'
-        linters:
-          - staticcheck
-          - revive
 issues:
   max-issues-per-linter: 0
   max-same-issues: 0
