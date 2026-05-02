@@ -11,6 +11,13 @@ import (
 	"time"
 )
 
+const (
+	testURL1   = "https://example.com/1"
+	testURL2   = "https://example.com/2"
+	testURL3   = "https://example.com/3"
+	testJobURL = "https://example.com/job"
+)
+
 var (
 	_ Job = (*CrawlJob)(nil)
 	_ Job = (*ParseJob)(nil)
@@ -163,8 +170,8 @@ func TestNewParseJob_NoData(t *testing.T) {
 func TestNewParseJob_WithData(t *testing.T) {
 	mockStor := &mockStorage{
 		rawData: []storage.RawData{
-			{URL: "https://example.com/1", RawContent: "<html>job 1</html>"},
-			{URL: "https://example.com/2", RawContent: "<html>job 2</html>"},
+			{URL: testURL1, RawContent: "<html>job 1</html>"},
+			{URL: testURL2, RawContent: "<html>job 2</html>"},
 		},
 	}
 
@@ -173,7 +180,7 @@ func TestNewParseJob_WithData(t *testing.T) {
 		ParserFn: func() (ParserJob, error) {
 			return &mockParser{
 				results: []models.ExtractedJobData{
-					{Title: "Engineer", Company: "ACME", Link: "https://example.com/job/1"},
+					{Title: "Engineer", Company: "ACME", Link: testJobURL + "/1"},
 				},
 			}, nil
 		},
@@ -214,7 +221,7 @@ func TestNewParseJob_ParserCreationError(t *testing.T) {
 	expectedErr := errors.New("llm unavailable")
 	mockStor := &mockStorage{
 		rawData: []storage.RawData{
-			{URL: "https://example.com/1", RawContent: "<html>job</html>"},
+			{URL: testURL1, RawContent: "<html>job</html>"},
 		},
 	}
 
@@ -236,9 +243,9 @@ func TestNewParseJob_ParserCreationError(t *testing.T) {
 func TestNewParseJob_BatchStorage(t *testing.T) {
 	mockStor := &mockStorage{
 		rawData: []storage.RawData{
-			{URL: "https://example.com/1", RawContent: "html1"},
-			{URL: "https://example.com/2", RawContent: "html2"},
-			{URL: "https://example.com/3", RawContent: "html3"},
+			{URL: testURL1, RawContent: "html1"},
+			{URL: testURL2, RawContent: "html2"},
+			{URL: testURL3, RawContent: "html3"},
 		},
 	}
 
@@ -247,7 +254,7 @@ func TestNewParseJob_BatchStorage(t *testing.T) {
 		ParserFn: func() (ParserJob, error) {
 			return &mockParser{
 				results: []models.ExtractedJobData{
-					{Title: "Job", Link: "https://example.com/job"},
+					{Title: "Job", Link: testJobURL},
 				},
 			}, nil
 		},
