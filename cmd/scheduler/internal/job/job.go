@@ -154,7 +154,7 @@ func executeParse(ctx context.Context, cfg *ParseConfig) error {
 				Salary:      r.Salary,
 				Description: r.Description,
 				Skills:      r.Skills,
-				Link:        r.Link,
+				Link:        item.URL,
 			})
 		}
 

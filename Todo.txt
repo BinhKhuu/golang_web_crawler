@@ -1,4 +1,6 @@
 todo: 
+    1. Add note about saving everything in UTC - 0 so filters using time should use UTC - 0 not local time.
+    1. Delete raw data after parsed
     1. Parse data does not store the parse data need to update to AFTER reviewing the code to store the data
     1. Playwright fetcher  
         - store fetched data to db

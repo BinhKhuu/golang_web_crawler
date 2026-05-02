@@ -175,8 +175,7 @@ func (f *PlaywrightFetcher) FetchSPAConfig(ctx context.Context, url string) ([]c
 		return []crawler.FetchResult{}, ctxErr
 	}
 	_, err = p.Goto(url, playwright.PageGotoOptions{
-		WaitUntil: playwright.WaitUntilStateNetworkidle,
-		Timeout:   playwright.Float(timeoutInMs),
+		Timeout: playwright.Float(timeoutInMs),
 	})
 	if err != nil {
 		return []crawler.FetchResult{}, err

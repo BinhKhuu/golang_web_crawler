@@ -41,7 +41,7 @@ func init() {
 func main() {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 
-	if err := godotenv.Load("../../.env"); err != nil {
+	if err := godotenv.Load(".env"); err != nil {
 		logger.Warn("failed to load .env file", "error", err)
 	}
 
@@ -69,7 +69,7 @@ func runScheduler(ctx context.Context, logger *slog.Logger, database *sql.DB, st
 	}
 	defer fetcher.Close()
 
-	startTime := time.Now()
+	startTime := time.Now().UTC().Add(-1 * time.Minute)
 
 	crawlJob := newCrawlJob(pwCfg.URL, fetcher, storageSvc, logger)
 	parseJob := newParseJob(storageSvc, database, logger, startTime)
