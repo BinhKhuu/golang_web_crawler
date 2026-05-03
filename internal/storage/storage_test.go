@@ -833,3 +833,61 @@ func Test_QueryTimeoutConstants(t *testing.T) {
 	_ = queryTimeout
 	_ = batchQueryTimeout
 }
+
+func Test_DeleteRawDataByURLs_Success(t *testing.T) {
+	_, mock, storageService := setupStorageTest(t)
+
+	urls := []string{"http://example.com/job1", "http://example.com/job2"}
+	mock.ExpectExec(`DELETE FROM raw_data WHERE url = ANY`).
+		WithArgs(sqlmock.AnyArg()).
+		WillReturnResult(sqlmock.NewResult(0, 2))
+
+	err := storageService.DeleteRawDataByURLs(context.Background(), urls)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %s", err)
+	}
+}
+
+func Test_DeleteRawDataByURLs_EmptyURLs(t *testing.T) {
+	_, _, storageService := setupStorageTest(t)
+
+	err := storageService.DeleteRawDataByURLs(context.Background(), []string{})
+	if err != nil {
+		t.Fatalf("unexpected error for empty URLs: %v", err)
+	}
+}
+
+func Test_DeleteRawDataByURLs_NilURLs(t *testing.T) {
+	_, _, storageService := setupStorageTest(t)
+
+	err := storageService.DeleteRawDataByURLs(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("unexpected error for nil URLs: %v", err)
+	}
+}
+
+func Test_DeleteRawDataByURLs_DBError(t *testing.T) {
+	_, mock, storageService := setupStorageTest(t)
+
+	urls := []string{"http://example.com/job1"}
+	mock.ExpectExec(`DELETE FROM raw_data WHERE url = ANY`).
+		WithArgs(sqlmock.AnyArg()).
+		WillReturnError(errors.New("connection refused"))
+
+	err := storageService.DeleteRawDataByURLs(context.Background(), urls)
+	if err == nil {
+		t.Fatal("expected error but got none")
+	}
+
+	if !strings.Contains(err.Error(), "deleting raw data by URLs") {
+		t.Fatalf("expected wrapped error message, got: %v", err)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %s", err)
+	}
+}

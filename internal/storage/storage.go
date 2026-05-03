@@ -137,6 +137,24 @@ func (s *Service) GetLatestRawData(ctx context.Context, startDate time.Time) ([]
 	return results, nil
 }
 
+// DeleteRawDataByURLs removes raw_data rows whose URLs match the provided list.
+func (s *Service) DeleteRawDataByURLs(ctx context.Context, urls []string) error {
+	if len(urls) == 0 {
+		return nil
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
+	defer cancel()
+
+	_, err := s.db.ExecContext(ctx,
+		`DELETE FROM raw_data WHERE url = ANY($1)`, pq.Array(urls),
+	)
+	if err != nil {
+		return fmt.Errorf("deleting raw data by URLs: %w", err)
+	}
+	return nil
+}
+
 func (s *Service) StoreJobListingData(ctx context.Context, job JobListing) error {
 	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
 	defer cancel()

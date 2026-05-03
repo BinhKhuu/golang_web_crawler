@@ -97,6 +97,7 @@ func (j *ParseJob) Execute(ctx context.Context) error {
 type StorageJob interface {
 	GetLatestRawData(ctx context.Context, startDate time.Time) ([]storage.RawData, error)
 	StoreExtractedJobDataBatchUpSert(ctx context.Context, results []storage.ExtractedJobData) error
+	DeleteRawDataByURLs(ctx context.Context, urls []string) error
 }
 
 // ParserJob abstracts the LLM-based parser.
@@ -122,6 +123,12 @@ func executeParse(ctx context.Context, cfg *ParseConfig) error {
 	if len(rawData) == 0 {
 		cfg.Logger.Info("no raw data to parse")
 		return nil
+	}
+
+	// Collect URLs for deletion after parsing completes.
+	urls := make([]string, len(rawData))
+	for i, item := range rawData {
+		urls[i] = item.URL
 	}
 
 	p, err := cfg.ParserFn()
@@ -159,8 +166,8 @@ func executeParse(ctx context.Context, cfg *ParseConfig) error {
 		}
 
 		if len(batch) >= batchSize {
-			if storeErr := cfg.Storage.StoreExtractedJobDataBatchUpSert(ctx, batch); storeErr != nil {
-				cfg.Logger.Warn("failed to store batch", "error", storeErr)
+			if err := cfg.Storage.StoreExtractedJobDataBatchUpSert(ctx, batch); err != nil {
+				return fmt.Errorf("failed to store batch: %w", err)
 			}
 			batch = make([]storage.ExtractedJobData, 0, batchSize)
 		}
@@ -168,8 +175,13 @@ func executeParse(ctx context.Context, cfg *ParseConfig) error {
 
 	if len(batch) > 0 {
 		if err := cfg.Storage.StoreExtractedJobDataBatchUpSert(ctx, batch); err != nil {
-			cfg.Logger.Warn("failed to store final batch", "error", err)
+			return fmt.Errorf("failed to store final batch: %w", err)
 		}
+	}
+
+	// Only delete raw data after all batch stores succeed.
+	if err := cfg.Storage.DeleteRawDataByURLs(ctx, urls); err != nil {
+		return fmt.Errorf("failed to delete parsed raw data: %w", err)
 	}
 
 	return nil
