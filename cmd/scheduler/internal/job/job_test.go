@@ -6,6 +6,7 @@ import (
 	"errors"
 	"golangwebcrawler/internal/models"
 	"golangwebcrawler/internal/storage"
+	"golangwebcrawler/internal/typeutil"
 	"log/slog"
 	"testing"
 	"time"
@@ -160,7 +161,7 @@ func TestNewParseJob_NoData(t *testing.T) {
 		Storage:   mockStor,
 		ParserFn:  func() (ParserJob, error) { return &mockParser{}, nil },
 		Logger:    slog.Default(),
-		StartDate: time.Now(),
+		StartDate: typeutil.UTCTimeNow(),
 	})
 
 	if err := j.Execute(t.Context()); err != nil {
@@ -186,7 +187,7 @@ func TestNewParseJob_WithData(t *testing.T) {
 			}, nil
 		},
 		Logger:    slog.Default(),
-		StartDate: time.Now(),
+		StartDate: typeutil.UTCTimeNow(),
 		BatchSize: 100,
 	})
 
@@ -209,7 +210,7 @@ func TestNewParseJob_StorageError(t *testing.T) {
 		Storage:   mockStor,
 		ParserFn:  func() (ParserJob, error) { return &mockParser{}, nil },
 		Logger:    slog.Default(),
-		StartDate: time.Now(),
+		StartDate: typeutil.UTCTimeNow(),
 	})
 
 	err := j.Execute(t.Context())
@@ -232,7 +233,7 @@ func TestNewParseJob_ParserCreationError(t *testing.T) {
 			return nil, expectedErr
 		},
 		Logger:    slog.Default(),
-		StartDate: time.Now(),
+		StartDate: typeutil.UTCTimeNow(),
 	})
 
 	err := j.Execute(t.Context())
@@ -260,7 +261,7 @@ func TestNewParseJob_BatchStorage(t *testing.T) {
 			}, nil
 		},
 		Logger:    slog.Default(),
-		StartDate: time.Now(),
+		StartDate: typeutil.UTCTimeNow(),
 		BatchSize: 2,
 	})
 
@@ -293,7 +294,7 @@ func TestNewParseJob_ContextCancellation(t *testing.T) {
 			}, nil
 		},
 		Logger:    slog.Default(),
-		StartDate: time.Now(),
+		StartDate: typeutil.UTCTimeNow(),
 		BatchSize: 10,
 	})
 
@@ -337,7 +338,7 @@ func TestNewParseJob_ParseErrorContinues(t *testing.T) {
 			}, nil
 		},
 		Logger:    slog.Default(),
-		StartDate: time.Now(),
+		StartDate: typeutil.UTCTimeNow(),
 		BatchSize: 100,
 	})
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"golangwebcrawler/internal/models"
+	"golangwebcrawler/internal/typeutil"
 	"log/slog"
 	"strings"
 	"testing"
@@ -43,8 +44,8 @@ var testJobListing = JobListing{
 	Currency:        "USD",
 	DescriptionHTML: "<p>Job description</p>",
 	DescriptionText: "Job description",
-	PostedDate:      timePtr(time.Now()),
-	ExpiresAt:       timePtr(time.Now().Add(30 * 24 * time.Hour)),
+	PostedDate:      timePtr(typeutil.UTCTimeNow()),
+	ExpiresAt:       timePtr(typeutil.UTCTimeNow().Add(30 * 24 * time.Hour)),
 	Source:          "ExampleSource",
 	SourceID:        "12345",
 	URL:             "http://example.com/job/12345",
@@ -161,7 +162,7 @@ func Test_GetLatestRawData(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			db, mock, storageService := setupStorageTest(t)
-			timeParam := time.Now().Add(-time.Hour)
+			timeParam := typeutil.UTCTimeNow().Add(-time.Hour)
 
 			tt.setupMock(mock, timeParam)
 
@@ -718,7 +719,7 @@ func Test_StoreJobListingData_WithNilFields(t *testing.T) {
 
 func Test_StoreJobListingData_FullFields(t *testing.T) {
 	db, mock, storageService := setupStorageTest(t)
-	now := time.Now()
+	now := typeutil.UTCTimeNow()
 	expiresAt := now.Add(30 * 24 * time.Hour)
 	jobListing := JobListing{
 		ID:              1,
@@ -770,7 +771,7 @@ func Test_NewService(t *testing.T) {
 }
 
 func Test_RawData_StructFields(t *testing.T) {
-	now := time.Now().Format(time.RFC3339)
+	now := typeutil.UTCTimeNow().Format(time.RFC3339)
 	r := RawData{
 		URL:         testURL,
 		ContentType: "text/html",

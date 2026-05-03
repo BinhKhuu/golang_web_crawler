@@ -11,6 +11,7 @@ import (
 	"golangwebcrawler/internal/fetcher/playwrightfetcher"
 	"golangwebcrawler/internal/models"
 	"golangwebcrawler/internal/storage"
+	"golangwebcrawler/internal/typeutil"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -71,7 +72,7 @@ func runScheduler(ctx context.Context, logger *slog.Logger, database *sql.DB, st
 	}
 	defer fetcher.Close()
 
-	startTime := time.Now().UTC().Add(-1 * time.Minute)
+	startTime := typeutil.UTCTimeNow().Add(-1 * time.Minute)
 
 	crawlJob := newCrawlJob(pwCfg.URL, fetcher, storageSvc, logger)
 	parseJob := newParseJob(storageSvc, database, logger, startTime)
