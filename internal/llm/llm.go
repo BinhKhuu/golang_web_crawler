@@ -4,9 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"golangwebcrawler/internal/models"
 	"regexp"
 	"strings"
+
+	"golangwebcrawler/internal/models"
 
 	"github.com/ollama/ollama/api"
 )

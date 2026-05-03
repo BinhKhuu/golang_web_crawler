@@ -2,9 +2,10 @@ package parser
 
 import (
 	"context"
-	"golangwebcrawler/internal/models"
 	"html"
 	"strings"
+
+	"golangwebcrawler/internal/models"
 
 	"github.com/PuerkitoBio/goquery"
 )

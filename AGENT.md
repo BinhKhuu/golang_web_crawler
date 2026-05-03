@@ -16,7 +16,7 @@
 - **LLM model**: Configured in `internal/llm/llm.go` (default: `mistral:latest`).
 
 ## Coding Standards
-
+- Run automatic styling fixes `golangci-lint run --fix`
 - Run `golangci-lint run ./...` before finishing — all lint checks must pass.
 - Run `go test ./...` — all tests must pass.
 - Use `atomic.Int32` instead of `int32` + manual atomic functions.

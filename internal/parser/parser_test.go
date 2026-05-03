@@ -3,8 +3,9 @@ package parser
 import (
 	"database/sql"
 	"errors"
-	"golangwebcrawler/internal/models"
 	"testing"
+
+	"golangwebcrawler/internal/models"
 
 	"github.com/DATA-DOG/go-sqlmock"
 )

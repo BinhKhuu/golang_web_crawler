@@ -4,12 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"golangwebcrawler/internal/crawler"
 	"log/slog"
 	"math/rand"
 	"net/http"
 	"strings"
 	"time"
+
+	"golangwebcrawler/internal/crawler"
 
 	"github.com/google/uuid"
 	"github.com/playwright-community/playwright-go"

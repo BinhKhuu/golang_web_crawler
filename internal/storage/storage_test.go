@@ -16,8 +16,6 @@ import (
 
 const testURL = "http://example.com"
 
-// ==================== Test Fixtures ====================
-
 var testJobCards = []ExtractedJobData{
 	{
 		Title:    "Software Engineer",
@@ -55,8 +53,6 @@ var testJobListing = JobListing{
 	RawJSON:         []byte(`{"title": "Software Engineer"}`),
 }
 
-// ==================== Test Helpers ====================
-
 func floatPtr(f float64) *float64 {
 	return &f
 }
@@ -64,8 +60,6 @@ func floatPtr(f float64) *float64 {
 func timePtr(t time.Time) *time.Time {
 	return &t
 }
-
-// ==================== StoreRawData Tests ====================
 
 func Test_StoreRawData_Success(t *testing.T) {
 	_, mock, storageService := setupStorageTest(t)
@@ -96,8 +90,6 @@ func Test_StoreRawData_Error(t *testing.T) {
 		t.Errorf("expected error to contain 'duplicate key', got: %s", err.Error())
 	}
 }
-
-// ==================== GetLatestRawData Tests (Table-Driven) ====================
 
 func Test_GetLatestRawData(t *testing.T) {
 	tests := map[string]struct {
@@ -199,8 +191,6 @@ func Test_GetLatestRawData(t *testing.T) {
 		})
 	}
 }
-
-// ==================== StoreRawDataBatch Tests ====================
 
 func Test_StoreRawDataBatch(t *testing.T) {
 	db, mock, storageService := setupStorageTest(t)
@@ -395,8 +385,6 @@ func Test_StoreRawDataBatch_BadConnectionRollback(t *testing.T) {
 	_ = db
 }
 
-// ==================== StoreExtractedJobDataBatch Tests ====================
-
 func Test_StoreExtractedJobDataBatch(t *testing.T) {
 	db, mock, storageService := setupStorageTest(t)
 
@@ -498,8 +486,6 @@ func Test_StoreExtractedJobDataBatch_CommitError(t *testing.T) {
 
 	_ = db
 }
-
-// ==================== StoreExtractedJobDataBatchUpSert Tests ====================
 
 func Test_StoreExtractedJobDataBatchUpSert(t *testing.T) {
 	db, mock, storageService := setupStorageTest(t)
@@ -662,8 +648,6 @@ func Test_StoreExtractedJobDataBatchUpSert_EmptyDescription(t *testing.T) {
 	_ = db
 }
 
-// ==================== StoreJobListingData Tests ====================
-
 func Test_StoreJobListingData(t *testing.T) {
 	db, mock, storageService := setupStorageTest(t)
 
@@ -768,8 +752,6 @@ func Test_StoreJobListingData_FullFields(t *testing.T) {
 
 	_ = db
 }
-
-// ==================== Service & Struct Tests ====================
 
 func Test_NewService(t *testing.T) {
 	db, _, _ := setupStorageTest(t)

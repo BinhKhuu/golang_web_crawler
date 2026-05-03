@@ -3,9 +3,10 @@ package orchestrator
 import (
 	"context"
 	"fmt"
-	"golangwebcrawler/cmd/scheduler/internal/job"
 	"log/slog"
 	"sync"
+
+	"golangwebcrawler/cmd/scheduler/internal/job"
 )
 
 // Mode defines how jobs are executed.

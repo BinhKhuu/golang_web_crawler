@@ -4,6 +4,12 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log/slog"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
 	"golangwebcrawler/cmd/scheduler/internal/job"
 	"golangwebcrawler/cmd/scheduler/internal/orchestrator"
 	"golangwebcrawler/internal/crawler"
@@ -13,11 +19,6 @@ import (
 	"golangwebcrawler/internal/models"
 	parserpkg "golangwebcrawler/internal/parser"
 	"golangwebcrawler/internal/storage"
-	"log/slog"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
 
 	"github.com/joho/godotenv"
 )
