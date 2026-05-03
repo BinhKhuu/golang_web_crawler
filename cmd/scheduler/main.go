@@ -13,12 +13,14 @@ import (
 	"golangwebcrawler/cmd/scheduler/internal/job"
 	"golangwebcrawler/cmd/scheduler/internal/orchestrator"
 	"golangwebcrawler/internal/crawler"
-	crawlerparser "golangwebcrawler/internal/crawlerparser"
 	"golangwebcrawler/internal/dbstore"
 	"golangwebcrawler/internal/fetcher/playwrightfetcher"
 	"golangwebcrawler/internal/models"
-	parserpkg "golangwebcrawler/internal/parser"
 	"golangwebcrawler/internal/storage"
+
+	crawlerparser "golangwebcrawler/internal/crawlerparser"
+
+	parserpkg "golangwebcrawler/internal/parser"
 
 	"github.com/joho/godotenv"
 )

@@ -59,6 +59,10 @@ RUN_FETCH_TESTS=1      # Set to 1 to enable fetch tests
 # CRAWLER_ALLOWED_DOMAINS=seek.com.au,example.com,iana.org
 ```
 
+### Timezone
+
+**Recommended:** Set your system and PostgreSQL timezone to **UTC (UTC+0)** to avoid timestamp inconsistencies. All timestamps in this project are expected to be in UTC. Use the helper in [`internal/typeutil/time.go`](internal/typeutil/time.go) for getting the current time — it always returns UTC.
+
 ### Export Environment Variables
 
 Before running migrations or the application, export the environment variables:
