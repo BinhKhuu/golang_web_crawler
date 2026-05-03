@@ -2,11 +2,10 @@ package llm
 
 import (
 	"context"
+	"golangwebcrawler/internal/models"
 	"log"
 	"os"
 	"testing"
-
-	"golangwebcrawler/internal/models"
 
 	"github.com/joho/godotenv"
 )

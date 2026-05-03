@@ -4,12 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"golangwebcrawler/internal/models"
 	"log/slog"
 	"reflect"
 	"sync"
 	"testing"
-
-	"golangwebcrawler/internal/models"
 )
 
 var (

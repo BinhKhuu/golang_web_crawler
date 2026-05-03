@@ -105,9 +105,6 @@ linters:
       - path: examples/
         linters:
           - gofumpt # we don't run gofumpt on generated examples, only goimports
-      - path: 'generator/generated/'
-        linters:
-          - gofumpt # we don't run gofumpt on generated code (used during testing)
       - path: _test.go
         linters:
           - unparam
@@ -118,12 +115,6 @@ issues:
 formatters:
   enable:
     - gofumpt
-    - goimports
-  settings:
-    # local prefixes regroup imports from these packages
-    goimports:
-      local-prefixes:
-        - golangwebcrawler
   exclusions:
     # do not exclude examples from linting
     paths:

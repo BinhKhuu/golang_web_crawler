@@ -3,13 +3,12 @@ package orchestrator
 import (
 	"context"
 	"errors"
+	"golangwebcrawler/cmd/scheduler/internal/job"
 	"log/slog"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
-
-	"golangwebcrawler/cmd/scheduler/internal/job"
 )
 
 const (

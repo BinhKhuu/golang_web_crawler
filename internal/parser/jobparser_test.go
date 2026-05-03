@@ -2,11 +2,10 @@ package parser
 
 import (
 	"context"
+	"golangwebcrawler/internal/models"
 	"os"
 	"strings"
 	"testing"
-
-	"golangwebcrawler/internal/models"
 )
 
 type mockLLMService struct{}

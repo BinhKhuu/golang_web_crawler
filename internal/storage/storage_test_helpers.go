@@ -2,11 +2,10 @@ package storage
 
 import (
 	"database/sql"
+	"golangwebcrawler/internal/models"
 	"log/slog"
 	"strings"
 	"testing"
-
-	"golangwebcrawler/internal/models"
 
 	"github.com/DATA-DOG/go-sqlmock"
 )

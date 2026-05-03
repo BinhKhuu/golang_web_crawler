@@ -1,10 +1,9 @@
 package dbstore
 
 import (
+	"golangwebcrawler/internal/testhelpers"
 	"os"
 	"testing"
-
-	"golangwebcrawler/internal/testhelpers"
 )
 
 func Test_GetConnectionString(t *testing.T) {

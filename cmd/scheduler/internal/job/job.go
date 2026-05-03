@@ -4,11 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log/slog"
-	"time"
-
 	"golangwebcrawler/internal/models"
 	"golangwebcrawler/internal/storage"
+	"log/slog"
+	"time"
 )
 
 // JobType represents the type of job to be executed.

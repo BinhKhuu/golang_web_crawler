@@ -3,12 +3,11 @@ package storage
 import (
 	"context"
 	"errors"
+	"golangwebcrawler/internal/models"
 	"log/slog"
 	"strings"
 	"testing"
 	"time"
-
-	"golangwebcrawler/internal/models"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	_ "github.com/lib/pq"

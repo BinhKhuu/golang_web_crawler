@@ -3,13 +3,12 @@ package crawler
 import (
 	"context"
 	"fmt"
+	"golangwebcrawler/internal/models"
 	"log/slog"
 	"net/url"
 	"strings"
 	"sync"
 	"time"
-
-	"golangwebcrawler/internal/models"
 )
 
 type Fetcher interface {
