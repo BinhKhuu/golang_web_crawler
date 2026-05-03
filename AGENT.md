@@ -22,9 +22,13 @@
 - Use `atomic.Int32` instead of `int32` + manual atomic functions.
 - Extract repeated string literals into constants (goconst).
 - Format imports with standard library, then third-party, then local packages.
+- Comments should be clear and concise, explaining the "why" behind complex logic, not just the "what".
+- Comments should not be used as a way to format the file into regions if that is happening consider moving the region or grouping the functions / methods by name.
+- Self-Documenting Code: Prioritize expressive variable and function names to reduce the need for comments entirely.
 
 ## Constraints
 
 - Do not change `.env` settings unless required for new unit tests.
 - Changes to crawler/parser logic must pass all existing tests.
 - Do not couple scheduler to command-private packages under `cmd/*/internal`.
+- Test code should not get compiled in production builds use golang langauge features to prevent test code from getting compiled

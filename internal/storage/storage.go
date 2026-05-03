@@ -6,10 +6,11 @@ import (
 	"database/sql/driver"
 	"errors"
 	"fmt"
-	"golangwebcrawler/internal/models"
 	"log/slog"
 	"strings"
 	"time"
+
+	"golangwebcrawler/internal/models"
 
 	"github.com/lib/pq"
 )

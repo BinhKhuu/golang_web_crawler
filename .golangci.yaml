@@ -123,8 +123,7 @@ formatters:
     # local prefixes regroup imports from these packages
     goimports:
       local-prefixes:
-        - github.com/go-openapi
-        - github.com/go-swagger/go-swagger # this is for imports in generated examples
+        - golangwebcrawler
   exclusions:
     # do not exclude examples from linting
     paths:
