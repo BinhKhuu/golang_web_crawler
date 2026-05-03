@@ -105,9 +105,6 @@ linters:
       - path: examples/
         linters:
           - gofumpt # we don't run gofumpt on generated examples, only goimports
-      - path: _test.go
-        linters:
-          - unparam
 issues:
   max-issues-per-linter: 0
   max-same-issues: 0

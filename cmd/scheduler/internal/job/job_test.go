@@ -18,6 +18,11 @@ const (
 	testURL3   = "https://example.com/3"
 	testJobURL = "https://example.com/job"
 	testTitle  = "Job"
+
+	// Test HTML content constants.
+	html1Content = "html1"
+	html2Content = "html2"
+	html3Content = "html3"
 )
 
 var (
@@ -252,9 +257,9 @@ func TestNewParseJob_ParserCreationError(t *testing.T) {
 func TestNewParseJob_BatchStorage(t *testing.T) {
 	mockStor := &mockStorage{
 		rawData: []storage.RawData{
-			{URL: testURL1, RawContent: "html1"},
-			{URL: testURL2, RawContent: "html2"},
-			{URL: testURL3, RawContent: "html3"},
+			{URL: testURL1, RawContent: html1Content},
+			{URL: testURL2, RawContent: html2Content},
+			{URL: testURL3, RawContent: html3Content},
 		},
 	}
 
@@ -286,8 +291,8 @@ func TestNewParseJob_ContextCancellation(t *testing.T) {
 
 	mockStor := &mockStorage{
 		rawData: []storage.RawData{
-			{URL: testURL1, RawContent: "html1"},
-			{URL: testURL2, RawContent: "html2"},
+			{URL: testURL1, RawContent: html1Content},
+			{URL: testURL2, RawContent: html2Content},
 		},
 	}
 
@@ -357,8 +362,8 @@ func TestNewParseJob_ParseErrorContinues(t *testing.T) {
 func TestNewParseJob_StoreFailureNoDelete(t *testing.T) {
 	mockStor := &mockStorage{
 		rawData: []storage.RawData{
-			{URL: testURL1, RawContent: "html1"},
-			{URL: testURL2, RawContent: "html2"},
+			{URL: testURL1, RawContent: html1Content},
+			{URL: testURL2, RawContent: html2Content},
 		},
 		storeErr: errors.New("store failed"),
 	}
@@ -394,8 +399,8 @@ func TestNewParseJob_StoreFailureNoDelete(t *testing.T) {
 func TestNewParseJob_StoreSuccessDeletesRawData(t *testing.T) {
 	mockStor := &mockStorage{
 		rawData: []storage.RawData{
-			{URL: testURL1, RawContent: "html1"},
-			{URL: testURL2, RawContent: "html2"},
+			{URL: testURL1, RawContent: html1Content},
+			{URL: testURL2, RawContent: html2Content},
 		},
 	}
 
@@ -429,9 +434,9 @@ func TestNewParseJob_StoreSuccessDeletesRawData(t *testing.T) {
 func TestNewParseJob_BatchStoreFailureNoDelete(t *testing.T) {
 	mockStor := &mockStorage{
 		rawData: []storage.RawData{
-			{URL: testURL1, RawContent: "html1"},
-			{URL: testURL2, RawContent: "html2"},
-			{URL: testURL3, RawContent: "html3"},
+			{URL: testURL1, RawContent: html1Content},
+			{URL: testURL2, RawContent: html2Content},
+			{URL: testURL3, RawContent: html3Content},
 		},
 		storeErr: errors.New("batch store failed"),
 	}

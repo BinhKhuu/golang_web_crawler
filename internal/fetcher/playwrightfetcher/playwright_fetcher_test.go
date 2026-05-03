@@ -60,7 +60,7 @@ func Test_FetchDefault(t *testing.T) {
 	if !runFetchTest {
 		t.Skip("Skipping: set RUN_FETCH_TESTS=1 to run")
 	}
-	url := "https://www.seek.com.au/software-engineer-jobs"
+	url := seekSoftwareEngineerJobsURL
 	ctx := context.Background()
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
 		Level: slog.LevelDebug,
@@ -182,8 +182,8 @@ func Test_WaitAndCollectResults_AndfetchSPAConfigDataSelectors(t *testing.T) {
 				</body>
 				</html>`,
 			resultsSelectors: []string{
-				"a[data-automation='jobTitle']",
-				"a.job-link",
+				seekJobTitleSelector,
+				seekJobLinkSelector,
 			},
 			dataSelectors: []string{
 				"a[data-automation='jobDetailsPage']",
@@ -213,7 +213,7 @@ func Test_WaitAndCollectResults_AndfetchSPAConfigDataSelectors(t *testing.T) {
 					<div id="job-details">Job details content</div>
 				</body>
 			</html>`,
-			resultsSelectors:    []string{"a[data-automation='jobTitle']"},
+			resultsSelectors:    []string{seekJobTitleSelector},
 			dataSelectors:       []string{"a.no-match"},
 			expectedResultCount: 0,
 		},
@@ -229,7 +229,7 @@ func Test_WaitAndCollectResults_AndfetchSPAConfigDataSelectors(t *testing.T) {
 				</body></html>
 				<div data-automation="jobDetailsPage3">Job details content3</div>
 				</body></html>`,
-			resultsSelectors: []string{"a[data-automation='jobTitle']"},
+			resultsSelectors: []string{seekJobTitleSelector},
 			dataSelectors: []string{
 				"div[data-automation='jobDetailsPage']",
 			},
@@ -247,7 +247,7 @@ func Test_WaitAndCollectResults_AndfetchSPAConfigDataSelectors(t *testing.T) {
 				</body></html>
 				<div data-automation="jobDetailsPage3">Job details content3</div>
 				</body></html>`,
-			resultsSelectors: []string{"a[data-automation='jobTitle']"},
+			resultsSelectors: []string{seekJobTitleSelector},
 			dataSelectors: []string{
 				"div[data-automation='jobDetailsPage']",
 				"div[data-automation='jobDetailsPage2']",
@@ -313,25 +313,25 @@ func Test_CanonicalizeFetchedURL(t *testing.T) {
 	}{
 		{
 			name:    "removes fragment and ignored params",
-			baseURL: "https://www.seek.com.au/software-engineer-jobs",
+			baseURL: seekSoftwareEngineerJobsURL,
 			href:    "/job/91318081?type=standard&ref=search-standalone&origin=cardTitle#sol=2ecb52bdcb0bfb96f8160ca64024c28215a0a063",
 			ignoreQueryParams: []string{
-				"sol",
-				"ref",
-				"origin",
+				seekTrackingParamSol,
+				seekTrackingParamRef,
+				seekTrackingParamOrigin,
 			},
 			expected: "https://www.seek.com.au/job/91318081?type=standard",
 		},
 		{
 			name:    "treats configured bare prefix as root-relative",
-			baseURL: "https://www.seek.com.au/software-engineer-jobs/in-All-Australia",
+			baseURL: seekSoftwareEngineerJobsURL + "/in-All-Australia",
 			href:    "job/91318081?type=standard&ref=search-standalone&origin=cardTitle#sol=383e9b9d93f39fc67d84d3223d264c7c94ae6961",
 			ignoreQueryParams: []string{
-				"sol",
-				"ref",
-				"origin",
+				seekTrackingParamSol,
+				seekTrackingParamRef,
+				seekTrackingParamOrigin,
 			},
-			rootPrefixes: []string{"job/"},
+			rootPrefixes: []string{seekJobPathPrefix},
 			expected:     "https://www.seek.com.au/job/91318081?type=standard",
 		},
 		{

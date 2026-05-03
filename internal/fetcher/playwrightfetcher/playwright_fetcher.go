@@ -485,8 +485,8 @@ func DefaultConfig() PlaywrightFetcherConfig {
 		Timeout:  defaultTimeout,
 		Search: SearchConfig{
 			InputSelectors: []string{
-				"input[name=keywords]",
-				"input[placeholder*='Search']",
+				seekKeywordsInputSelector,
+				seekSearchPlaceholder,
 			},
 			Query: "Software Engineer Jobs",
 			SubmitSelectors: []string{
@@ -496,20 +496,20 @@ func DefaultConfig() PlaywrightFetcherConfig {
 		},
 		Results: ResultsConfig{
 			ListingSelectors: []string{
-				"a[data-automation='jobTitle']",
-				"a.job-link",
-				"a[data-testid='job-result']",
+				seekJobTitleSelector,
+				seekJobLinkSelector,
+				seekJobTestIdSelector,
 			},
 			DataSelectors: []string{
 				"a[id*='job-title']",
-				"a[data-automation='jobTitle']",
+				seekJobTitleSelector,
 				".job-title a",
 				"article a[href*='/job/']",
 			},
 		},
 		Canonicalization: CanonicalizationConfig{
-			IgnoreQueryParams:    []string{"sol", "ref", "origin"},
-			RootRelativePrefixes: []string{"job/"},
+			IgnoreQueryParams:    []string{seekTrackingParamSol, seekTrackingParamRef, seekTrackingParamOrigin},
+			RootRelativePrefixes: []string{seekJobPathPrefix},
 		},
 	}
 }

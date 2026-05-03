@@ -14,31 +14,57 @@ import (
 	_ "github.com/lib/pq"
 )
 
-const testURL = "http://example.com"
+const (
+	testURL           = "http://example.com"
+	softwareEngineer  = "Software Engineer"
+	exampleInc        = "Example Inc"
+	remoteLocation    = "Remote"
+	salary100kTo150k  = "$100k - $150k"
+	seekJobURL1       = "https://www.seek.com.au/job1"
+	dockerSkill       = "Docker"
+	backendDeveloper  = "Backend Developer"
+	techCorp          = "Tech Corp"
+	newYorkNY         = "New York, NY"
+	salary120kTo170k  = "$120k - $170k"
+	seekJobURL2       = "https://www.seek.com.au/job2"
+	awsSkill          = "AWS"
+	contentTypeColumn = "content_type"
+	example2Com       = "http://example2.com"
+	html1Content      = "<html>1</html>"
+	testCorp          = "Test Corp"
+	goSkill           = "Go"
+	pythonSkill       = "Python"
+	rawContentColumn  = "raw_content"
+	example1Com       = "http://example1.com"
+	urlColumn         = "url"
+	textHtml          = "text/html"
+)
+
+const testURLSingle = "http://example.com"
 
 var testJobCards = []ExtractedJobData{
 	{
-		Title:    "Software Engineer",
-		Company:  "Example Inc",
-		Location: "Remote",
-		Salary:   "$100k - $150k",
-		Link:     "https://www.seek.com.au/job1",
-		Skills:   []string{"Go", "Docker"},
+		Title:    softwareEngineer,
+		Company:  exampleInc,
+		Location: remoteLocation,
+		Salary:   salary100kTo150k,
+		Link:     seekJobURL1,
+		Skills:   []string{goSkill, dockerSkill},
 	},
 	{
-		Title:    "Backend Developer",
-		Company:  "Tech Corp",
-		Location: "New York, NY",
-		Salary:   "$120k - $170k",
-		Link:     "https://www.seek.com.au/job2",
-		Skills:   []string{"Python", "AWS"},
+		Title:    backendDeveloper,
+		Company:  techCorp,
+		Location: newYorkNY,
+		Salary:   salary120kTo170k,
+		Link:     seekJobURL2,
+		Skills:   []string{pythonSkill, awsSkill},
 	},
 }
 
 var testJobListing = JobListing{
-	Company:         "Example Inc",
+	Company:         exampleInc,
 	RemoteFlag:      true,
-	Location:        "Remote",
+	Location:        remoteLocation,
 	SalaryMin:       floatPtr(750000.50),
 	SalaryMax:       floatPtr(150000),
 	Currency:        "USD",
@@ -49,7 +75,7 @@ var testJobListing = JobListing{
 	Source:          "ExampleSource",
 	SourceID:        "12345",
 	URL:             "http://example.com/job/12345",
-	Tags:            []string{"Go", "Remote"},
+	Tags:            []string{goSkill, remoteLocation},
 	RawJSON:         []byte(`{"title": "Software Engineer"}`),
 }
 
@@ -100,8 +126,8 @@ func Test_GetLatestRawData(t *testing.T) {
 	}{
 		"ReturnsRawData": {
 			setupMock: func(mock sqlmock.Sqlmock, timeParam time.Time) {
-				rows := sqlmock.NewRows([]string{"url", "content_type", "raw_content"}).
-					AddRow(testURL, "text/html", "<html></html>")
+				rows := sqlmock.NewRows([]string{urlColumn, contentTypeColumn, rawContentColumn}).
+					AddRow(testURLSingle, "text/html", html1Content)
 				mock.ExpectQuery(`SELECT .+ FROM raw_data`).
 					WithArgs(timeParam).
 					WillReturnRows(rows)
@@ -115,9 +141,9 @@ func Test_GetLatestRawData(t *testing.T) {
 		},
 		"WithFetchedAt": {
 			setupMock: func(mock sqlmock.Sqlmock, timeParam time.Time) {
-				rows := sqlmock.NewRows([]string{"url", "content_type", "raw_content"}).
-					AddRow(testURL, "text/html", "<html></html>").
-					AddRow("http://example2.com", "application/json", `{"key": "value"}`)
+				rows := sqlmock.NewRows([]string{urlColumn, contentTypeColumn, rawContentColumn}).
+					AddRow(testURLSingle, "text/html", html1Content).
+					AddRow(example2Com, "application/json", `{"key": "value"}`)
 				mock.ExpectQuery(`SELECT .+ FROM raw_data`).
 					WithArgs(timeParam).
 					WillReturnRows(rows)
@@ -127,17 +153,17 @@ func Test_GetLatestRawData(t *testing.T) {
 				if len(result) != 2 {
 					t.Fatalf("expected 2 results, got %d", len(result))
 				}
-				if result[0].URL != testURL {
+				if result[0].URL != testURLSingle {
 					t.Errorf("expected URL 'http://example.com', got '%s'", result[0].URL)
 				}
-				if result[1].URL != "http://example2.com" {
+				if result[1].URL != example2Com {
 					t.Errorf("expected URL 'http://example2.com', got '%s'", result[1].URL)
 				}
 			},
 		},
 		"EmptyResults": {
 			setupMock: func(mock sqlmock.Sqlmock, timeParam time.Time) {
-				rows := sqlmock.NewRows([]string{"url", "content_type", "raw_content"})
+				rows := sqlmock.NewRows([]string{"url", "content_type", rawContentColumn})
 				mock.ExpectQuery(`SELECT .+ FROM raw_data`).
 					WithArgs(timeParam).
 					WillReturnRows(rows)
@@ -195,8 +221,8 @@ func Test_GetLatestRawData(t *testing.T) {
 func Test_StoreRawDataBatch(t *testing.T) {
 	db, mock, storageService := setupStorageTest(t)
 	items := []models.RawDataItem{
-		{URL: "http://example1.com", ContentType: "text/html", RawContent: "<html>1</html>"},
-		{URL: "http://example2.com", ContentType: "text/html", RawContent: "<html>2</html>"},
+		{URL: example1Com, ContentType: textHtml, RawContent: html1Content},
+		{URL: "http://example2.com", ContentType: textHtml, RawContent: "<html>2</html>"},
 	}
 
 	expectStoreRawDataBatchSuccess(mock, items)
@@ -224,7 +250,7 @@ func Test_StoreRawDataBatch_NilItems(t *testing.T) {
 func Test_StoreRawDataBatch_MultipleItems(t *testing.T) {
 	db, mock, storageService := setupStorageTest(t)
 	items := []models.RawDataItem{
-		{URL: "http://example1.com", ContentType: "text/html", RawContent: "<html>1</html>"},
+		{URL: example1Com, ContentType: textHtml, RawContent: html1Content},
 		{URL: "http://example2.com", ContentType: "application/json", RawContent: `{"key": "value"}`},
 		{URL: "http://example3.com", ContentType: "text/plain", RawContent: "plain text"},
 	}
@@ -239,7 +265,7 @@ func Test_StoreRawDataBatch_MultipleItems(t *testing.T) {
 
 func Test_StoreRawDataBatch_BeginTxError(t *testing.T) {
 	db, mock, storageService := setupStorageTest(t)
-	items := []models.RawDataItem{{URL: "http://example1.com", ContentType: "text/html", RawContent: "<html>1</html>"}}
+	items := []models.RawDataItem{{URL: example1Com, ContentType: textHtml, RawContent: html1Content}}
 
 	mock.ExpectBegin().WillReturnError(errors.New("connection error"))
 	err := storageService.StoreRawDataBatch(context.Background(), items)
@@ -256,7 +282,7 @@ func Test_StoreRawDataBatch_BeginTxError(t *testing.T) {
 
 func Test_StoreRawDataBatch_CreateTempTableError(t *testing.T) {
 	db, mock, storageService := setupStorageTest(t)
-	items := []models.RawDataItem{{URL: "http://example1.com", ContentType: "text/html", RawContent: "<html>1</html>"}}
+	items := []models.RawDataItem{{URL: example1Com, ContentType: textHtml, RawContent: html1Content}}
 
 	mock.ExpectBegin()
 	mock.ExpectExec(`CREATE TEMP TABLE raw_data_batch`).WillReturnError(errors.New("table already exists"))
@@ -274,13 +300,13 @@ func Test_StoreRawDataBatch_CreateTempTableError(t *testing.T) {
 
 func Test_StoreRawDataBatch_CopyExecError(t *testing.T) {
 	db, mock, storageService := setupStorageTest(t)
-	items := []models.RawDataItem{{URL: "http://example1.com", ContentType: "text/html", RawContent: "<html>1</html>"}}
+	items := []models.RawDataItem{{URL: example1Com, ContentType: textHtml, RawContent: html1Content}}
 
 	mock.ExpectBegin()
 	mock.ExpectExec(`CREATE TEMP TABLE raw_data_batch`).WillReturnResult(sqlmock.NewResult(0, 0))
 	mock.ExpectPrepare(`COPY "raw_data_batch" \("url", "content_type", "raw_content"\) FROM STDIN`)
 	mock.ExpectExec(`COPY "raw_data_batch"`).
-		WithArgs("http://example1.com", "text/html", "<html>1</html>").
+		WithArgs(example1Com, textHtml, html1Content).
 		WillReturnError(errors.New("copy error"))
 
 	err := storageService.StoreRawDataBatch(context.Background(), items)
@@ -297,13 +323,13 @@ func Test_StoreRawDataBatch_CopyExecError(t *testing.T) {
 
 func Test_StoreRawDataBatch_FlushError(t *testing.T) {
 	db, mock, storageService := setupStorageTest(t)
-	items := []models.RawDataItem{{URL: "http://example1.com", ContentType: "text/html", RawContent: "<html>1</html>"}}
+	items := []models.RawDataItem{{URL: example1Com, ContentType: textHtml, RawContent: html1Content}}
 
 	mock.ExpectBegin()
 	mock.ExpectExec(`CREATE TEMP TABLE raw_data_batch`).WillReturnResult(sqlmock.NewResult(0, 0))
 	mock.ExpectPrepare(`COPY "raw_data_batch" \("url", "content_type", "raw_content"\) FROM STDIN`)
 	mock.ExpectExec(`COPY "raw_data_batch"`).
-		WithArgs("http://example1.com", "text/html", "<html>1</html>").
+		WithArgs(example1Com, textHtml, html1Content).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec(`COPY "raw_data_batch"`).WillReturnError(errors.New("flush error"))
 
@@ -321,13 +347,13 @@ func Test_StoreRawDataBatch_FlushError(t *testing.T) {
 
 func Test_StoreRawDataBatch_UpsertError(t *testing.T) {
 	db, mock, storageService := setupStorageTest(t)
-	items := []models.RawDataItem{{URL: "http://example1.com", ContentType: "text/html", RawContent: "<html>1</html>"}}
+	items := []models.RawDataItem{{URL: example1Com, ContentType: textHtml, RawContent: html1Content}}
 
 	mock.ExpectBegin()
 	mock.ExpectExec(`CREATE TEMP TABLE raw_data_batch`).WillReturnResult(sqlmock.NewResult(0, 0))
 	mock.ExpectPrepare(`COPY "raw_data_batch" \("url", "content_type", "raw_content"\) FROM STDIN`)
 	mock.ExpectExec(`COPY "raw_data_batch"`).
-		WithArgs("http://example1.com", "text/html", "<html>1</html>").
+		WithArgs(example1Com, textHtml, html1Content).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec(`COPY "raw_data_batch"`).WillReturnResult(sqlmock.NewResult(0, 0))
 	mock.ExpectExec(`INSERT INTO raw_data .+ FROM raw_data_batch`).WillReturnError(errors.New("upsert error"))
@@ -346,13 +372,13 @@ func Test_StoreRawDataBatch_UpsertError(t *testing.T) {
 
 func Test_StoreRawDataBatch_CommitError(t *testing.T) {
 	db, mock, storageService := setupStorageTest(t)
-	items := []models.RawDataItem{{URL: "http://example1.com", ContentType: "text/html", RawContent: "<html>1</html>"}}
+	items := []models.RawDataItem{{URL: example1Com, ContentType: textHtml, RawContent: html1Content}}
 
 	mock.ExpectBegin()
 	mock.ExpectExec(`CREATE TEMP TABLE raw_data_batch`).WillReturnResult(sqlmock.NewResult(0, 0))
 	mock.ExpectPrepare(`COPY "raw_data_batch" \("url", "content_type", "raw_content"\) FROM STDIN`)
 	mock.ExpectExec(`COPY "raw_data_batch"`).
-		WithArgs("http://example1.com", "text/html", "<html>1</html>").
+		WithArgs(example1Com, textHtml, html1Content).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec(`COPY "raw_data_batch"`).WillReturnResult(sqlmock.NewResult(0, 0))
 	mock.ExpectExec(`INSERT INTO raw_data .+ FROM raw_data_batch`).WillReturnResult(sqlmock.NewResult(0, 1))
@@ -372,7 +398,7 @@ func Test_StoreRawDataBatch_CommitError(t *testing.T) {
 
 func Test_StoreRawDataBatch_BadConnectionRollback(t *testing.T) {
 	db, mock, storageService := setupStorageTest(t)
-	items := []models.RawDataItem{{URL: "http://example1.com", ContentType: "text/html", RawContent: "<html>1</html>"}}
+	items := []models.RawDataItem{{URL: example1Com, ContentType: textHtml, RawContent: html1Content}}
 
 	mock.ExpectBegin()
 	mock.ExpectExec(`CREATE TEMP TABLE raw_data_batch`).WillReturnError(errors.New("bad connection"))
@@ -413,8 +439,8 @@ func Test_StoreExtractedJobDataBatch_NilResults(t *testing.T) {
 func Test_StoreExtractedJobDataBatch_MultipleItems(t *testing.T) {
 	db, mock, storageService := setupStorageTest(t)
 	jobCards := []ExtractedJobData{
-		{Title: "Software Engineer", Company: "Example Inc", Location: "Remote", Salary: "$100k - $150k", Link: "https://www.seek.com.au/job1", Skills: []string{"Go", "Docker"}},
-		{Title: "Backend Developer", Company: "Tech Corp", Location: "New York, NY", Salary: "$120k - $170k", Link: "https://www.seek.com.au/job2", Skills: []string{"Python", "AWS"}},
+		{Title: softwareEngineer, Company: exampleInc, Location: remoteLocation, Salary: salary100kTo150k, Link: seekJobURL1, Skills: []string{goSkill, dockerSkill}},
+		{Title: backendDeveloper, Company: techCorp, Location: newYorkNY, Salary: salary120kTo170k, Link: seekJobURL2, Skills: []string{pythonSkill, awsSkill}},
 		{Title: "DevOps Engineer", Company: "Cloud Inc", Location: "London, UK", Salary: "$130k - $180k", Link: "https://www.seek.com.au/job3", Skills: []string{"Kubernetes", "Terraform"}},
 	}
 
@@ -429,13 +455,13 @@ func Test_StoreExtractedJobDataBatch_MultipleItems(t *testing.T) {
 func Test_StoreExtractedJobDataBatch_NilSkills(t *testing.T) {
 	db, mock, storageService := setupStorageTest(t)
 	jobCards := []ExtractedJobData{
-		{Title: "Software Engineer", Company: "Example Inc", Location: "Remote", Salary: "$100k - $150k", Link: "https://www.seek.com.au/job1", Skills: nil},
+		{Title: softwareEngineer, Company: exampleInc, Location: remoteLocation, Salary: salary100kTo150k, Link: seekJobURL1, Skills: nil},
 	}
 
 	mock.ExpectBegin()
 	mock.ExpectPrepare(`COPY "extracted_jobdata" \("title", "company", "location", "salary", "description", "link", "skills"\) FROM STDIN`)
 	mock.ExpectExec(`COPY "extracted_jobdata"`).
-		WithArgs("Software Engineer", "Example Inc", "Remote", "$100k - $150k", "", "https://www.seek.com.au/job1", "").
+		WithArgs(softwareEngineer, exampleInc, remoteLocation, salary100kTo150k, "", "https://www.seek.com.au/job1", "").
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 
@@ -524,8 +550,8 @@ func Test_StoreExtractedJobDataBatchUpSert_NilResults(t *testing.T) {
 func Test_StoreExtractedJobDataBatchUpSert_MultipleItems(t *testing.T) {
 	db, mock, storageService := setupStorageTest(t)
 	jobCards := []ExtractedJobData{
-		{Title: "Software Engineer", Company: "Example Inc", Location: "Remote", Salary: "$100k - $150k", Link: "https://www.seek.com.au/job1", Skills: []string{"Go", "Docker"}},
-		{Title: "Backend Developer", Company: "Tech Corp", Location: "New York, NY", Salary: "$120k - $170k", Link: "https://www.seek.com.au/job2", Skills: []string{"Python", "AWS"}},
+		{Title: softwareEngineer, Company: exampleInc, Location: remoteLocation, Salary: salary100kTo150k, Link: seekJobURL1, Skills: []string{goSkill, dockerSkill}},
+		{Title: backendDeveloper, Company: techCorp, Location: newYorkNY, Salary: salary120kTo170k, Link: seekJobURL2, Skills: []string{pythonSkill, awsSkill}},
 	}
 
 	mock.ExpectBegin()
@@ -548,13 +574,13 @@ func Test_StoreExtractedJobDataBatchUpSert_MultipleItems(t *testing.T) {
 func Test_StoreExtractedJobDataBatchUpSert_NilSkills(t *testing.T) {
 	db, mock, storageService := setupStorageTest(t)
 	jobCards := []ExtractedJobData{
-		{Title: "Software Engineer", Company: "Example Inc", Location: "Remote", Salary: "$100k - $150k", Link: "https://www.seek.com.au/job1", Skills: nil},
+		{Title: softwareEngineer, Company: exampleInc, Location: remoteLocation, Salary: salary100kTo150k, Link: seekJobURL1, Skills: nil},
 	}
 
 	mock.ExpectBegin()
 	mock.ExpectPrepare(`INSERT INTO extracted_jobdata \(title, company, location, salary, description, link, skills\) VALUES \(\$1, \$2, \$3, \$4, \$5, \$6, \$7\) ON CONFLICT \(link\) DO UPDATE SET title = EXCLUDED.title, company = EXCLUDED.company, location = EXCLUDED.location, salary = EXCLUDED.salary, description = EXCLUDED.description, skills = EXCLUDED.skills`)
 	mock.ExpectExec(`INSERT INTO extracted_jobdata`).
-		WithArgs("Software Engineer", "Example Inc", "Remote", "$100k - $150k", "", "https://www.seek.com.au/job1", "").
+		WithArgs(softwareEngineer, exampleInc, remoteLocation, salary100kTo150k, "", "https://www.seek.com.au/job1", "").
 		WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectCommit()
 
@@ -631,13 +657,13 @@ func Test_StoreExtractedJobDataBatchUpSert_CommitError(t *testing.T) {
 func Test_StoreExtractedJobDataBatchUpSert_EmptyDescription(t *testing.T) {
 	db, mock, storageService := setupStorageTest(t)
 	jobCards := []ExtractedJobData{
-		{Title: "Software Engineer", Company: "Example Inc", Location: "Remote", Salary: "$100k - $150k", Description: "", Link: "https://www.seek.com.au/job1", Skills: []string{"Go"}},
+		{Title: softwareEngineer, Company: exampleInc, Location: remoteLocation, Salary: salary100kTo150k, Description: "", Link: seekJobURL1, Skills: []string{goSkill}},
 	}
 
 	mock.ExpectBegin()
 	mock.ExpectPrepare(`INSERT INTO extracted_jobdata \(title, company, location, salary, description, link, skills\) VALUES \(\$1, \$2, \$3, \$4, \$5, \$6, \$7\) ON CONFLICT \(link\) DO UPDATE SET title = EXCLUDED.title, company = EXCLUDED.company, location = EXCLUDED.location, salary = EXCLUDED.salary, description = EXCLUDED.description, skills = EXCLUDED.skills`)
 	mock.ExpectExec(`INSERT INTO extracted_jobdata`).
-		WithArgs("Software Engineer", "Example Inc", "Remote", "$100k - $150k", "", "https://www.seek.com.au/job1", "Go").
+		WithArgs(softwareEngineer, exampleInc, remoteLocation, salary100kTo150k, "", "https://www.seek.com.au/job1", "Go").
 		WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectCommit()
 
@@ -689,8 +715,8 @@ func Test_StoreJobListingData_WithNilFields(t *testing.T) {
 	db, mock, storageService := setupStorageTest(t)
 	jobListing := JobListing{
 		Title:           "Test Job",
-		Company:         "Test Corp",
-		Location:        "Remote",
+		Company:         testCorp,
+		Location:        remoteLocation,
 		RemoteFlag:      false,
 		SalaryMin:       nil,
 		SalaryMax:       nil,
@@ -737,7 +763,7 @@ func Test_StoreJobListingData_FullFields(t *testing.T) {
 		Source:          "LinkedIn",
 		SourceID:        "job-12345",
 		URL:             "https://linkedin.com/job/12345",
-		Tags:            []string{"Go", "Kubernetes", "Remote"},
+		Tags:            []string{goSkill, "Kubernetes", remoteLocation},
 		RawJSON:         []byte(`{"title": "Senior Software Engineer", "company": "Big Tech Corp"}`),
 		CrawlTimestamp:  now,
 	}
@@ -774,7 +800,7 @@ func Test_RawData_StructFields(t *testing.T) {
 	now := typeutil.UTCTimeNow().Format(time.RFC3339)
 	r := RawData{
 		URL:         testURL,
-		ContentType: "text/html",
+		ContentType: textHtml,
 		RawContent:  "<html></html>",
 		FetchedAt:   now,
 	}
