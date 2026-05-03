@@ -6,6 +6,7 @@ import (
 	"errors"
 	"golangwebcrawler/internal/models"
 	"golangwebcrawler/internal/storage"
+	"golangwebcrawler/internal/typeutil"
 	"log/slog"
 	"testing"
 	"time"
@@ -17,6 +18,11 @@ const (
 	testURL3   = "https://example.com/3"
 	testJobURL = "https://example.com/job"
 	testTitle  = "Job"
+
+	// Test HTML content constants.
+	html1Content = "html1"
+	html2Content = "html2"
+	html3Content = "html3"
 )
 
 var (
@@ -130,7 +136,9 @@ type mockStorage struct {
 	rawData     []storage.RawData
 	storeErr    error
 	fetchErr    error
+	deleteErr   error
 	storedItems []storage.ExtractedJobData
+	deletedURLs []string
 }
 
 func (m *mockStorage) GetLatestRawData(ctx context.Context, startDate time.Time) ([]storage.RawData, error) {
@@ -140,6 +148,11 @@ func (m *mockStorage) GetLatestRawData(ctx context.Context, startDate time.Time)
 func (m *mockStorage) StoreExtractedJobDataBatchUpSert(ctx context.Context, results []storage.ExtractedJobData) error {
 	m.storedItems = append(m.storedItems, results...)
 	return m.storeErr
+}
+
+func (m *mockStorage) DeleteRawDataByURLs(ctx context.Context, urls []string) error {
+	m.deletedURLs = append(m.deletedURLs, urls...)
+	return m.deleteErr
 }
 
 type mockParser struct {
@@ -160,7 +173,7 @@ func TestNewParseJob_NoData(t *testing.T) {
 		Storage:   mockStor,
 		ParserFn:  func() (ParserJob, error) { return &mockParser{}, nil },
 		Logger:    slog.Default(),
-		StartDate: time.Now(),
+		StartDate: typeutil.UTCTimeNow(),
 	})
 
 	if err := j.Execute(t.Context()); err != nil {
@@ -186,7 +199,7 @@ func TestNewParseJob_WithData(t *testing.T) {
 			}, nil
 		},
 		Logger:    slog.Default(),
-		StartDate: time.Now(),
+		StartDate: typeutil.UTCTimeNow(),
 		BatchSize: 100,
 	})
 
@@ -209,7 +222,7 @@ func TestNewParseJob_StorageError(t *testing.T) {
 		Storage:   mockStor,
 		ParserFn:  func() (ParserJob, error) { return &mockParser{}, nil },
 		Logger:    slog.Default(),
-		StartDate: time.Now(),
+		StartDate: typeutil.UTCTimeNow(),
 	})
 
 	err := j.Execute(t.Context())
@@ -232,7 +245,7 @@ func TestNewParseJob_ParserCreationError(t *testing.T) {
 			return nil, expectedErr
 		},
 		Logger:    slog.Default(),
-		StartDate: time.Now(),
+		StartDate: typeutil.UTCTimeNow(),
 	})
 
 	err := j.Execute(t.Context())
@@ -244,9 +257,9 @@ func TestNewParseJob_ParserCreationError(t *testing.T) {
 func TestNewParseJob_BatchStorage(t *testing.T) {
 	mockStor := &mockStorage{
 		rawData: []storage.RawData{
-			{URL: testURL1, RawContent: "html1"},
-			{URL: testURL2, RawContent: "html2"},
-			{URL: testURL3, RawContent: "html3"},
+			{URL: testURL1, RawContent: html1Content},
+			{URL: testURL2, RawContent: html2Content},
+			{URL: testURL3, RawContent: html3Content},
 		},
 	}
 
@@ -260,7 +273,7 @@ func TestNewParseJob_BatchStorage(t *testing.T) {
 			}, nil
 		},
 		Logger:    slog.Default(),
-		StartDate: time.Now(),
+		StartDate: typeutil.UTCTimeNow(),
 		BatchSize: 2,
 	})
 
@@ -278,8 +291,8 @@ func TestNewParseJob_ContextCancellation(t *testing.T) {
 
 	mockStor := &mockStorage{
 		rawData: []storage.RawData{
-			{URL: testURL1, RawContent: "html1"},
-			{URL: testURL2, RawContent: "html2"},
+			{URL: testURL1, RawContent: html1Content},
+			{URL: testURL2, RawContent: html2Content},
 		},
 	}
 
@@ -293,7 +306,7 @@ func TestNewParseJob_ContextCancellation(t *testing.T) {
 			}, nil
 		},
 		Logger:    slog.Default(),
-		StartDate: time.Now(),
+		StartDate: typeutil.UTCTimeNow(),
 		BatchSize: 10,
 	})
 
@@ -337,12 +350,118 @@ func TestNewParseJob_ParseErrorContinues(t *testing.T) {
 			}, nil
 		},
 		Logger:    slog.Default(),
-		StartDate: time.Now(),
+		StartDate: typeutil.UTCTimeNow(),
 		BatchSize: 100,
 	})
 
 	if err := j.Execute(t.Context()); err != nil {
 		t.Errorf("expected no error, got %v", err)
+	}
+}
+
+func TestNewParseJob_StoreFailureNoDelete(t *testing.T) {
+	mockStor := &mockStorage{
+		rawData: []storage.RawData{
+			{URL: testURL1, RawContent: html1Content},
+			{URL: testURL2, RawContent: html2Content},
+		},
+		storeErr: errors.New("store failed"),
+	}
+
+	j := NewParseJob(&ParseConfig{
+		Storage: mockStor,
+		ParserFn: func() (ParserJob, error) {
+			return &mockParser{
+				results: []models.ExtractedJobData{
+					{Title: testTitle, Link: testJobURL},
+				},
+			}, nil
+		},
+		Logger:    slog.Default(),
+		StartDate: typeutil.UTCTimeNow(),
+		BatchSize: 100,
+	})
+
+	err := j.Execute(t.Context())
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	if len(mockStor.deletedURLs) > 0 {
+		t.Errorf("expected no URLs deleted on store failure, got %v", mockStor.deletedURLs)
+	}
+
+	if len(mockStor.storedItems) == 0 {
+		t.Error("expected stored items to be attempted")
+	}
+}
+
+func TestNewParseJob_StoreSuccessDeletesRawData(t *testing.T) {
+	mockStor := &mockStorage{
+		rawData: []storage.RawData{
+			{URL: testURL1, RawContent: html1Content},
+			{URL: testURL2, RawContent: html2Content},
+		},
+	}
+
+	j := NewParseJob(&ParseConfig{
+		Storage: mockStor,
+		ParserFn: func() (ParserJob, error) {
+			return &mockParser{
+				results: []models.ExtractedJobData{
+					{Title: testTitle, Link: testJobURL},
+				},
+			}, nil
+		},
+		Logger:    slog.Default(),
+		StartDate: typeutil.UTCTimeNow(),
+		BatchSize: 100,
+	})
+
+	if err := j.Execute(t.Context()); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if len(mockStor.deletedURLs) != 2 {
+		t.Errorf("expected 2 URLs deleted, got %d", len(mockStor.deletedURLs))
+	}
+
+	if len(mockStor.storedItems) != 2 {
+		t.Errorf("expected 2 stored items, got %d", len(mockStor.storedItems))
+	}
+}
+
+func TestNewParseJob_BatchStoreFailureNoDelete(t *testing.T) {
+	mockStor := &mockStorage{
+		rawData: []storage.RawData{
+			{URL: testURL1, RawContent: html1Content},
+			{URL: testURL2, RawContent: html2Content},
+			{URL: testURL3, RawContent: html3Content},
+		},
+		storeErr: errors.New("batch store failed"),
+	}
+
+	j := NewParseJob(&ParseConfig{
+		Storage: mockStor,
+		ParserFn: func() (ParserJob, error) {
+			return &mockParser{
+				results: []models.ExtractedJobData{
+					{Title: testTitle, Link: testJobURL},
+				},
+			}, nil
+		},
+		Logger:    slog.Default(),
+		StartDate: typeutil.UTCTimeNow(),
+		BatchSize: 2,
+	})
+
+	err := j.Execute(t.Context())
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	if len(mockStor.deletedURLs) > 0 {
+		t.Errorf("expected no URLs deleted on batch store failure, got %v", mockStor.deletedURLs)
 	}
 }
 

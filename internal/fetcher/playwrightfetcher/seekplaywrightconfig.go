@@ -1,31 +1,51 @@
 package playwrightfetcher
 
+const (
+	// Seek selectors.
+	seekJobTitleSelector       = "a[data-automation='jobTitle']"
+	seekJobLinkSelector        = "a.job-link"
+	seekJobTestIdSelector      = "a[data-testid='job-result']"
+	seekKeywordsInputSelector  = "input[name=keywords]"
+	seekSearchPlaceholder      = "input[placeholder*='Search']"
+	seekSubmitButton           = "button[type='submit']"
+	seekAutomationSearchButton = "button[data-automation='searchButton']"
+
+	// Seek canonicalization.
+	seekTrackingParamSol    = "sol"
+	seekTrackingParamRef    = "ref"
+	seekTrackingParamOrigin = "origin"
+	seekJobPathPrefix       = "job/"
+
+	// Seek default URLs.
+	seekSoftwareEngineerJobsURL = "https://www.seek.com.au/software-engineer-jobs"
+)
+
 func GetSeekConfiguration() PlaywrightFetcherConfig {
 	return PlaywrightFetcherConfig{
 		// Target
-		URL:      "https://www.seek.com.au/software-engineer-jobs",
+		URL:      seekSoftwareEngineerJobsURL,
 		Headless: true,
 		Timeout:  defaultTimeout,
 
 		// Search interaction: fill input, submit, then wait for results
 		Search: SearchConfig{
 			InputSelectors: []string{
-				"input[name=keywords]",
-				"input[placeholder*='Search']",
+				seekKeywordsInputSelector,
+				seekSearchPlaceholder,
 			},
 			Query: "Software Engineer Jobs",
 			SubmitSelectors: []string{
-				"button[type='submit']",
-				"button[data-automation='searchButton']",
+				seekSubmitButton,
+				seekAutomationSearchButton,
 			},
 		},
 
 		// Result collection: selectors for job listing links, then detail content
 		Results: ResultsConfig{
 			ListingSelectors: []string{
-				"a[data-automation='jobTitle']",
-				"a.job-link",
-				"a[data-testid='job-result']",
+				seekJobTitleSelector,
+				seekJobLinkSelector,
+				seekJobTestIdSelector,
 			},
 			DataSelectors: []string{
 				"#job-details",
@@ -38,8 +58,8 @@ func GetSeekConfiguration() PlaywrightFetcherConfig {
 
 		// URL canonicalization: strip tracking params and resolve root-relative hrefs
 		Canonicalization: CanonicalizationConfig{
-			IgnoreQueryParams:    []string{"sol", "ref", "origin"},
-			RootRelativePrefixes: []string{"job/"},
+			IgnoreQueryParams:    []string{seekTrackingParamSol, seekTrackingParamRef, seekTrackingParamOrigin},
+			RootRelativePrefixes: []string{seekJobPathPrefix},
 		},
 	}
 }

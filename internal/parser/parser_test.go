@@ -12,7 +12,7 @@ import (
 type UnsupportedParser struct{}
 
 func Test_NewParser_JobListing(t *testing.T) {
-	db, _, dbClose := mockDb()
+	db, dbClose := mockDb()
 	defer dbClose()
 
 	p, err := NewParser[models.JobListing](db)
@@ -28,7 +28,7 @@ func Test_NewParser_JobListing(t *testing.T) {
 }
 
 func Test_NewParser_Unsupported(t *testing.T) {
-	db, _, dbClose := mockDb()
+	db, dbClose := mockDb()
 	defer dbClose()
 	_, err := NewParser[UnsupportedParser](db)
 	if err == nil {
@@ -41,10 +41,10 @@ func Test_NewParser_Unsupported(t *testing.T) {
 	}
 }
 
-func mockDb() (*sql.DB, *sqlmock.Sqlmock, func()) {
-	db, mock, err := sqlmock.New()
+func mockDb() (*sql.DB, func()) {
+	db, _, err := sqlmock.New()
 	if err != nil {
 		panic("failed to create mock database: " + err.Error())
 	}
-	return db, &mock, func() { db.Close() }
+	return db, func() { db.Close() }
 }

@@ -7,12 +7,11 @@ import (
 	"golangwebcrawler/cmd/scheduler/internal/job"
 	"golangwebcrawler/cmd/scheduler/internal/orchestrator"
 	"golangwebcrawler/internal/crawler"
-	crawlerparser "golangwebcrawler/internal/crawlerparser"
 	"golangwebcrawler/internal/dbstore"
 	"golangwebcrawler/internal/fetcher/playwrightfetcher"
 	"golangwebcrawler/internal/models"
-	parserpkg "golangwebcrawler/internal/parser"
 	"golangwebcrawler/internal/storage"
+	"golangwebcrawler/internal/typeutil"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -20,6 +19,10 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
+
+	crawlerparser "golangwebcrawler/internal/crawlerparser"
+
+	parserpkg "golangwebcrawler/internal/parser"
 )
 
 const (
@@ -69,7 +72,7 @@ func runScheduler(ctx context.Context, logger *slog.Logger, database *sql.DB, st
 	}
 	defer fetcher.Close()
 
-	startTime := time.Now().UTC().Add(-1 * time.Minute)
+	startTime := typeutil.UTCTimeNow().Add(-1 * time.Minute)
 
 	crawlJob := newCrawlJob(pwCfg.URL, fetcher, storageSvc, logger)
 	parseJob := newParseJob(storageSvc, database, logger, startTime)

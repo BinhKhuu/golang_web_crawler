@@ -123,9 +123,9 @@ func Test_VisitedIsThreadSafe(t *testing.T) {
 	wg.Wait()
 }
 
-func createMockFetcher(url string, statusCode int, body []byte, err error) *MockFetcher {
+func createMockFetcher(_ string, statusCode int, body []byte, err error) *MockFetcher {
 	return &MockFetcher{
-		URL:        url,
+		URL:        testBaseURL,
 		StatusCode: statusCode,
 		Body:       body,
 		Err:        err,
