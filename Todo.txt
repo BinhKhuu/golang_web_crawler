@@ -1,4 +1,5 @@
 todo: 
+    1. Update layout move /internal into cmd/internal
     1. Playwright fetcher  
         - Investigate how to return network data 
         - add notes on play wright bot detection as readme
