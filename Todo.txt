@@ -1,12 +1,12 @@
 todo: 
-    1. Playwright fetcher  
-        - Investigate how to return network data 
-        - add notes on play wright bot detection as readme
-
     1. Scheduler turn into a CMD application with goflags 
         - type of fetcher (playwrightfetcher or http) set through CMD flags
         - allow specifing the .env file location through flags 
             - .env will be the enviorment the fetcher will save to
+        - see SCHEDULER_CLI_PLAN.md
+    1. Playwright fetcher  
+        - Investigate how to return network data 
+        - add notes on play wright bot detection as readme
 
     2. Cralwer Design
         2. Update crawler to get more speicified data or design a data splitter / organiser to validate the data before feeding it to the LLM for job Parsing

@@ -12,7 +12,7 @@ import (
 func main() {
 	parser, err := BuildParser()
 	if err != nil {
-		log.Fatal("Error building parser %s", err)
+		log.Fatalf("Error building parser %s", err)
 	}
 	_, pErr := parser.Parse()
 	if pErr != nil {

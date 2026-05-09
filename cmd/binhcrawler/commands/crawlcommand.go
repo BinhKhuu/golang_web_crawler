@@ -24,7 +24,7 @@ type CrawlCommand struct {
 
 func (c *CrawlCommand) Execute(_ []string) error {
 	c.Logger.Info("Starting crawl command")
-	// 1. Setup logger with configured log level
+
 	// 2. Setup database connection
 	// 3. Build PlaywrightFetcherConfig from flags
 	// 4. Create CrawlJob with configured parameters
