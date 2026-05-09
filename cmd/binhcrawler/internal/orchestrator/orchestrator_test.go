@@ -3,7 +3,7 @@ package orchestrator
 import (
 	"context"
 	"errors"
-	"golangwebcrawler/cmd/scheduler/internal/job"
+	"golangwebcrawler/cmd/binhcrawler/internal/job"
 	"log/slog"
 	"sync"
 	"sync/atomic"
