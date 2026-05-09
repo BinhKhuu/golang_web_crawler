@@ -2,6 +2,7 @@ package parser
 
 import (
 	"context"
+	"errors"
 	"golangwebcrawler/internal/models"
 	"os"
 	"strings"
@@ -19,6 +20,9 @@ const (
 	melbourneVIC     = "Melbourne VIC"
 	brisbaneQLD      = "Brisbane QLD"
 	softwareEngineer = "Software Engineer"
+
+	// Test data constants for mock LLM responses.
+	exampleBaseURL = "https://example.com"
 )
 
 func (m *mockLLMService) QueryLLM(ctx context.Context, prompt string) ([]models.ExtractedJobData, error) {
@@ -260,6 +264,10 @@ func Test_ParseJobDataLLM(t *testing.T) {
 		t.Fatalf("Error parsing job data: %v", err)
 	}
 
+	if len(jobDetails) == 0 {
+		t.Fatal("expected job details from LLM, got empty slice")
+	}
+
 	if jobDetails[0].Title != expected.Title {
 		t.Errorf("Expected Title '%s', got '%s'", expected.Title, jobDetails[0].Title)
 	}
@@ -274,6 +282,63 @@ func Test_ParseJobDataLLM(t *testing.T) {
 	}
 }
 
+func Test_ParseJobDataLLM_ErrorFromLLM(t *testing.T) {
+	mockErr := errors.New("llm query failed")
+	mockLLMWithError := &mockLLMServiceError{err: mockErr}
+	parser := &JobListingParser{
+		LLMService: mockLLMWithError,
+	}
+
+	_, err := parser.ParseJobDataLLM(context.Background(), "<article>test</article>")
+	if err == nil {
+		t.Fatal("expected error from LLM, got nil")
+	}
+	if !errors.Is(err, mockErr) {
+		t.Errorf("expected error %v, got %v", mockErr, err)
+	}
+}
+
+func Test_ParseJobDataLLM_MultipleJobs(t *testing.T) {
+	mockMultipleJobs := &mockLLMServiceMulti{}
+	parser := &JobListingParser{
+		LLMService: mockMultipleJobs,
+	}
+
+	jobs, err := parser.ParseJobDataLLM(context.Background(), "<article>test</article>")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(jobs) != 3 {
+		t.Errorf("expected 3 jobs, got %d", len(jobs))
+	}
+
+	expectedTitles := []string{"Job A", "Job B", "Job C"}
+	for i, job := range jobs {
+		if job.Title != expectedTitles[i] {
+			t.Errorf("job %d: expected title '%s', got '%s'", i, expectedTitles[i], job.Title)
+		}
+	}
+}
+
+type mockLLMServiceError struct {
+	err error
+}
+
+func (m *mockLLMServiceError) QueryLLM(ctx context.Context, prompt string) ([]models.ExtractedJobData, error) {
+	return nil, m.err
+}
+
+type mockLLMServiceMulti struct{}
+
+func (m *mockLLMServiceMulti) QueryLLM(ctx context.Context, prompt string) ([]models.ExtractedJobData, error) {
+	return []models.ExtractedJobData{
+		{Title: "Job A", Company: "Company A", Link: exampleBaseURL + "/1"},
+		{Title: "Job B", Company: "Company B", Link: exampleBaseURL + "/2"},
+		{Title: "Job C", Company: "Company C", Link: exampleBaseURL + "/3"},
+	}, nil
+}
+
 func Test_CleanDataForLLM(t *testing.T) {
 	testData, _ := getTestLLMData(t, testFilePathCard)
 	cleanedData, err := cleanHTMLForLLM(testData)
@@ -281,23 +346,261 @@ func Test_CleanDataForLLM(t *testing.T) {
 		t.Fatalf("Error cleaning HTML for LLM: %v", err)
 	}
 
-	if strings.Contains(cleanedData, "\n") {
-		t.Error("Cleaned data should not contain newlines")
+	if len(cleanedData) == 0 {
+		t.Error("expected non-empty cleaned data")
 	}
-	if strings.Contains(cleanedData, "\t") {
-		t.Error("Cleaned data should not contain tabs")
-	}
+
 	if len(cleanedData) >= len(testData) {
-		t.Error("Cleaned data should be shorter than original data")
+		t.Error("cleaned data should be shorter than original data")
 	}
 
-	if strings.Contains(cleanedData, "Software Engineer at Tech Company in San Francisco, CA with a salary of $120,000 - $150,000") {
-		t.Errorf("Cleaned data does not match expected output. Got: %s", cleanedData)
+	// Tabs should be removed since we trim each line.
+	if strings.Contains(cleanedData, "\t") {
+		t.Error("cleaned data should not contain tabs")
 	}
 
+	// HTML tags should be stripped.
 	if strings.Contains(cleanedData, "<script>") || strings.Contains(cleanedData, "<style>") ||
 		strings.Contains(cleanedData, "<nav>") || strings.Contains(cleanedData, "<footer>") ||
 		strings.Contains(cleanedData, "<iframe>") || strings.Contains(cleanedData, "<noscript>") {
-		t.Error("Cleaned data should not contain script or style tags")
+		t.Error("cleaned data should not contain script or style tags")
+	}
+
+	// Lines are joined with double newlines, so triple newlines should not appear.
+	if strings.Contains(cleanedData, "\n\n\n") {
+		t.Error("cleaned data should not contain triple newlines")
+	}
+}
+
+func Test_NewJobListingParser(t *testing.T) {
+	mockLLM := &mockLLMService{}
+	parser := NewJobListingParser(mockLLM)
+
+	if parser == nil {
+		t.Fatal("expected non-nil parser")
+	}
+
+	jobParser, ok := parser.(*JobListingParser)
+	if !ok {
+		t.Fatalf("expected *JobListingParser, got %T", parser)
+	}
+
+	if jobParser.LLMService != mockLLM {
+		t.Error("expected LLMService to be set")
+	}
+}
+
+func Test_NewJobListingParser_Interface(t *testing.T) {
+	mockLLM := &mockLLMService{}
+	parser := NewJobListingParser(mockLLM)
+
+	if _, ok := any(parser).(Parser[models.JobListing]); !ok {
+		t.Fatal("expected parser to implement Parser[models.JobListing] interface")
+	}
+}
+
+func Test_ParseQuery(t *testing.T) {
+	testData, _ := getTestData(t)
+	mockLLM := &mockLLMService{}
+	parser := NewJobListingParser(mockLLM)
+
+	jobs, err := parser.ParseQuery(context.Background(), testData)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(jobs) == 0 {
+		t.Fatal("expected job listings, got empty slice")
+	}
+
+	if jobs[0].Title == "" {
+		t.Error("expected non-empty title")
+	}
+}
+
+func Test_ParseLLM(t *testing.T) {
+	testData, _ := getTestData(t)
+	mockLLM := &mockLLMService{}
+	parser := NewJobListingParser(mockLLM)
+
+	jobs, err := parser.ParseLLM(context.Background(), testData)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(jobs) == 0 {
+		t.Fatal("expected job details, got empty slice")
+	}
+
+	if jobs[0].Title != "Software Engineer" {
+		t.Errorf("expected 'Software Engineer', got '%s'", jobs[0].Title)
+	}
+}
+
+func Test_ParseJobDataQuery_EmptyHTML(t *testing.T) {
+	jobs, err := ParseJobDataQuery("")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(jobs) != 0 {
+		t.Errorf("expected empty slice for empty HTML, got %d jobs", len(jobs))
+	}
+}
+
+func Test_ParseJobDataQuery_NoJobCards(t *testing.T) {
+	html := `<div><p>No job cards here</p></div>`
+	jobs, err := ParseJobDataQuery(html)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(jobs) != 0 {
+		t.Errorf("expected empty slice for HTML without job cards, got %d jobs", len(jobs))
+	}
+}
+
+func Test_SanitiseExtractedData(t *testing.T) {
+	t.Run("unescapes HTML entities", func(t *testing.T) {
+		data := []models.ExtractedJobData{
+			{Link: "https://example.com/job?foo=bar&baz=qux"},
+		}
+
+		result := sanitiseExtractedData(data)
+
+		expected := "https://example.com/job?foo=bar&baz=qux"
+		if result[0].Link != expected {
+			t.Errorf("expected '%s', got '%s'", expected, result[0].Link)
+		}
+	})
+
+	t.Run("empty slice", func(t *testing.T) {
+		var data []models.ExtractedJobData
+
+		result := sanitiseExtractedData(data)
+
+		// Function returns nil for nil input (in-place modification).
+		if result != nil {
+			t.Errorf("expected nil for nil input, got %d items", len(result))
+		}
+	})
+
+	t.Run("empty initialized slice", func(t *testing.T) {
+		data := []models.ExtractedJobData{}
+
+		result := sanitiseExtractedData(data)
+
+		if len(result) != 0 {
+			t.Errorf("expected empty slice, got %d items", len(result))
+		}
+	})
+
+	t.Run("multiple jobs", func(t *testing.T) {
+		data := []models.ExtractedJobData{
+			{Link: "https://example.com/1&page=2"},
+			{Link: "https://example.com/2<test>"},
+			{Link: "https://example.com/3"},
+		}
+
+		result := sanitiseExtractedData(data)
+
+		expecteds := []string{
+			"https://example.com/1&page=2",
+			"https://example.com/2<test>",
+			"https://example.com/3",
+		}
+
+		for i, expected := range expecteds {
+			if result[i].Link != expected {
+				t.Errorf("job %d: expected '%s', got '%s'", i, expected, result[i].Link)
+			}
+		}
+	})
+
+	t.Run("empty link", func(t *testing.T) {
+		data := []models.ExtractedJobData{
+			{Link: ""},
+		}
+
+		result := sanitiseExtractedData(data)
+
+		if result[0].Link != "" {
+			t.Errorf("expected empty link, got '%s'", result[0].Link)
+		}
+	})
+}
+
+func Test_CleanHTMLForLLM_RemoveScriptTags(t *testing.T) {
+	html := `<html><body><script>var x = 1;</script><p>Hello</p></body></html>`
+	result, err := cleanHTMLForLLM(html)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if strings.Contains(result, "var x") {
+		t.Error("expected script content to be removed")
+	}
+
+	if !strings.Contains(result, "Hello") {
+		t.Error("expected non-script content to remain")
+	}
+}
+
+func Test_CleanHTMLForLLM_RemoveStyleTags(t *testing.T) {
+	html := `<html><body><style>.foo{color:red;}</style><p>Hello</p></body></html>`
+	result, err := cleanHTMLForLLM(html)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if strings.Contains(result, "color") {
+		t.Error("expected style content to be removed")
+	}
+
+	if !strings.Contains(result, "Hello") {
+		t.Error("expected non-style content to remain")
+	}
+}
+
+func Test_CleanHTMLForLLM_NewlineNormalization(t *testing.T) {
+	html := `<html><body><p>Line 1</p>\r\n<p>Line 2</p>\n<p>Line 3</p></body></html>`
+	result, err := cleanHTMLForLLM(html)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if strings.Contains(result, "\r") {
+		t.Error("expected no carriage returns in result")
+	}
+
+	if strings.Contains(result, "\n\n\n") {
+		t.Error("expected no triple newlines in result")
+	}
+
+	if !strings.Contains(result, "Line 1") || !strings.Contains(result, "Line 2") || !strings.Contains(result, "Line 3") {
+		t.Error("expected all lines to be present in result")
+	}
+}
+
+func Test_CleanHTMLForLLM_EmptyInput(t *testing.T) {
+	result, err := cleanHTMLForLLM("")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if result != "" {
+		t.Errorf("expected empty string, got '%s'", result)
+	}
+}
+
+func Test_CleanHTMLForLLM_OnlyWhitespace(t *testing.T) {
+	html := "   \n\t  \r\n   "
+	result, err := cleanHTMLForLLM(html)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if result != "" {
+		t.Errorf("expected empty string for whitespace-only input, got '%s'", result)
 	}
 }
