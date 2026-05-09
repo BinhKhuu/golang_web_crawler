@@ -41,7 +41,8 @@ func init() {
 	})
 }
 
-func main() {
+// old main for now - will be replaced by the new main
+func main2() {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 
 	if err := godotenv.Load(".env"); err != nil {
