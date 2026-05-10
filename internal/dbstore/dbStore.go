@@ -9,6 +9,8 @@ import (
 	"net"
 	"os"
 	"time"
+
+	_ "github.com/lib/pq"
 )
 
 const (
