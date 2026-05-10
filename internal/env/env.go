@@ -1,5 +1,6 @@
 // Package env provides a reliable way to find the project root directory and load .env files.
 // It works for unit tests, debugging (VS Code launch configs), and running the program.
+// The project root is detected by finding a .project-root marker file at the directory root.
 package env
 
 import (
@@ -11,6 +12,9 @@ import (
 
 	"github.com/joho/godotenv"
 )
+
+// projectRootMarker is the filename used to identify the project root directory.
+const projectRootMarker = ".project-root"
 
 var projectRootOnce struct {
 	root   string
@@ -53,17 +57,13 @@ func findProjectRoot() (string, error) {
 		return root, nil
 	}
 
-	return "", errors.New("could not find project root: no .env or go.mod file found")
+	return "", errors.New("could not find project root: no .project-root marker file found")
 }
 
-// verifyProjectRoot assumes that Project root will contain .env and .gomod file
-// return empty string if neither .env or .gomod file are not there
-// todo: think of a better way to verify the project root since .env and .gomod in child folders could cause bugs.
+// verifyProjectRoot checks if the directory contains the project root marker file.
+// It returns the directory path if found, otherwise an empty string.
 func verifyProjectRoot(dir string) string {
-	if _, err := os.Stat(filepath.Join(dir, ".env")); err == nil {
-		return dir
-	}
-	if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+	if _, err := os.Stat(filepath.Join(dir, projectRootMarker)); err == nil {
 		return dir
 	}
 	return ""

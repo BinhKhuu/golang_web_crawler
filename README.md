@@ -274,6 +274,30 @@ go run cmd/scheduler/main.go
 
 ---
 
+## 📁 Project Structure & Root Detection
+
+### Project Root Marker
+
+The project root is identified by the presence of a `.project-root` marker file at the repository root. This explicit marker is used by [`internal/env/env.go`](internal/env/env.go) to detect the project boundary.
+
+**Detection Logic:**
+1. Checks current working directory for `.project-root`
+2. Searches upward from current directory to parent directories
+3. Falls back to searching from the calling package's location
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| [`.project-root`](.project-root) | Marker file identifying the project root directory |
+| [`go.mod`](go.mod) | Go module definition and dependencies |
+| [`.env`](.env) | Environment variables (not tracked in Git) |
+| [`docker-compose.yaml`](docker-compose.yaml) | Docker services configuration (PostgreSQL, Ollama) |
+| [`.golangci.yaml`](.golangci.yaml) | Go linter configuration |
+| [`.gitignore`](.gitignore) | Git ignore rules |
+
+---
+
 ## 📚 Additional Documentation
 
 - [`MIGRATIONS.md`](MIGRATIONS.md) - Database migration guide
