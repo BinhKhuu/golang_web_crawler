@@ -3,6 +3,7 @@ package commands
 import (
 	"database/sql"
 	"golangwebcrawler/internal/dbstore"
+	"golangwebcrawler/internal/fetcher/playwrightfetcher"
 )
 
 const (
@@ -45,7 +46,9 @@ func (c *CrawlCommand) Execute(_ []string) error {
 			c.Logger.Info("closed database")
 		}
 	}()
+
 	// 3. Build PlaywrightFetcherConfig from flags
+	buildPlaywrightFetcherConfig(c)
 	// 4. Create CrawlJob with configured parameters
 	// 5. If ParseAfter, also create ParseJob
 	// 6. Parse Mode string to orchestrator.Mode
@@ -61,4 +64,14 @@ func InitDb() (*sql.DB, error) {
 		return db, dbErr
 	}
 	return db, dbErr
+}
+
+// todo implement /plans/playwright-config-plan.md
+func buildPlaywrightFetcherConfig(c *CrawlCommand) (playwrightfetcher.PlaywrightFetcherConfig, error) {
+
+	// if args are null use defult
+	// pwCfg := playwrightfetcher.GetSeekConfiguration()
+	var config playwrightfetcher.PlaywrightFetcherConfig
+
+	return config, nil
 }
