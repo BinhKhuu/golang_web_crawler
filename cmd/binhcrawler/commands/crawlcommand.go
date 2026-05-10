@@ -1,5 +1,10 @@
 package commands
 
+import (
+	"errors"
+	"golangwebcrawler/internal/dbstore"
+)
+
 const (
 	LogLevelDebug = "debug"
 	LogLevelInfo  = "info"
@@ -25,7 +30,12 @@ type CrawlCommand struct {
 func (c *CrawlCommand) Execute(_ []string) error {
 	c.Logger.Info("Starting crawl command")
 
-	// 2. Setup database connection
+	// todo name _ db when its ready for use
+	_, dbErr := dbstore.SetupDatabase()
+	if dbErr != nil {
+		c.Logger.Error("error setting up database")
+		return errors.New("failed to set up database")
+	}
 	// 3. Build PlaywrightFetcherConfig from flags
 	// 4. Create CrawlJob with configured parameters
 	// 5. If ParseAfter, also create ParseJob

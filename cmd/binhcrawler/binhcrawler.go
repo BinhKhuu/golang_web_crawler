@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"golangwebcrawler/cmd/binhcrawler/commands"
+	"golangwebcrawler/internal/env"
 	"log"
 	"os"
 
@@ -10,6 +11,10 @@ import (
 )
 
 func main() {
+	if err := env.LoadEnv(); err != nil {
+		log.Printf("Warning: failed to load .env file: %v", err)
+	}
+
 	parser, err := BuildParser()
 	if err != nil {
 		log.Fatalf("Error building parser %s", err)

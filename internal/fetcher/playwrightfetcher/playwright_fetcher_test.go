@@ -3,6 +3,7 @@ package playwrightfetcher
 import (
 	"context"
 	"fmt"
+	"golangwebcrawler/internal/env"
 	"log"
 	"log/slog"
 	"net/http"
@@ -11,14 +12,13 @@ import (
 	"testing"
 	"unicode/utf8"
 
-	"github.com/joho/godotenv"
 	"github.com/playwright-community/playwright-go"
 )
 
 var runFetchTest = false
 
 func TestMain(m *testing.M) {
-	if err := godotenv.Load("../../../.env"); err != nil {
+	if err := env.LoadEnv(); err != nil {
 		log.Println("No .env file found, falling back to system env")
 	}
 	runFetchTest = os.Getenv("RUN_FETCH_TESTS") == "1"

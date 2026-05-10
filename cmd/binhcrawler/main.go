@@ -18,11 +18,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/joho/godotenv"
-
 	crawlerparser "golangwebcrawler/internal/crawlerparser"
 
 	parserpkg "golangwebcrawler/internal/parser"
+
+	"github.com/joho/godotenv"
 )
 
 const (
@@ -41,7 +41,7 @@ func init() {
 	})
 }
 
-// old main for now - will be replaced by the new main
+// old main for now - will be replaced by the new main.
 func main2() {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 
