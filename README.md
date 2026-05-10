@@ -307,6 +307,50 @@ The project root is identified by the presence of a `.project-root` marker file 
 
 ---
 
+## ⚠️ Error Handling Guidelines
+
+### When to Use Named Sentinel Errors (`var ErrXxx = errors.New(...)`)
+
+Add a named sentinel error **only when**:
+- Callers need to check `errors.Is(err, ErrXxx)` for control flow decisions
+- The error represents a distinct, reusable domain condition
+
+Examples in this project:
+- [`ErrNoJson`](internal/llm/llm.go:19) — callers check `errors.Is(err, ErrNoJson)`
+- [`ErrUnsupportedParserType`](internal/parser/parser.go:18) — callers check `errors.Is(err, ErrUnsupportedParserType)`
+
+### When to Use Inline Errors (`errors.New(...)`)
+
+Use inline `errors.New()` for:
+- One-off errors that are just logged and returned as-is (no `errors.Is()` checks)
+- Test mocks and test assertions
+- Configuration errors (e.g., missing environment variables in `internal/dbstore/`)
+
+Examples:
+- `"DB_USER environment variable is not set"` in [`internal/dbstore/dbStore.go`](internal/dbstore/dbStore.go)
+- `"fetch error"` in test mocks
+
+### Anti-Pattern: Unnecessary Named Errors
+
+Don't add named errors just for the sake of having them. If no caller checks `errors.Is(err, ErrXxx)`, a named error adds boilerplate without benefit. For example, in [`crawlcommand.go`](cmd/binhcrawler/commands/crawlcommand.go), the `InitDb()` and `db.Close()` errors are just logged and passed through — no named error needed.
+
+### Error Handling Pattern
+
+```go
+// Good: Named sentinel for callers to check
+var ErrConnectionFailed = errors.New("database connection failed")
+
+// Good: Inline for logging-only or test cases
+if err := db.Ping(); err != nil {
+    logger.Error("failed to ping database", "error", err)
+    return errors.New("database connection failed")
+}
+
+// Good: Test mocks use inline errors
+mockFn := func() (*sql.DB, error) { return nil, errors.New("Mock Error") }
+```
+---
+
 ## 🐛 playwright package
 
 playwright is used to 'smart crawl' - installation requires installing all the playwright dependencies:

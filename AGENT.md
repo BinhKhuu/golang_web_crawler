@@ -33,3 +33,6 @@
 - Do not couple scheduler to command-private packages under `cmd/*/internal`.
 - Test code should not get compiled in production builds use golang langauge features to prevent test code from getting compiled
 - Do not remove usings _ "github.com/lib/pq" or the same pattern these are mandatory and look like they are not used but they are.
+-Add a named sentinel error **only when**:
+    - Callers need to check `errors.Is(err, ErrXxx)` for control flow decisions
+    - The error represents a distinct, reusable domain condition
