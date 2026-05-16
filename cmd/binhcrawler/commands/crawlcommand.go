@@ -54,7 +54,6 @@ func (c *CrawlCommand) Execute(_ []string) error {
 		}
 	}()
 
-	// 3. Build PlaywrightFetcherConfig from flags
 	pwConfig, pwErr := buildPlaywrightFetcherConfig(c, c.Logger)
 	if pwErr != nil {
 		c.Logger.Error("failed to build playwright config", "error", pwErr)

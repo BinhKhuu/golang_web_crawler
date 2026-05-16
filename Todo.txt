@@ -1,10 +1,6 @@
 todo: 
     1. Scheduler turn into a CMD application with goflags 
-        - type of fetcher (playwrightfetcher or http) set through CMD flags
-        - allow specifing the .env file location through flags 
-            - .env will be the enviorment the fetcher will save to
-        - see /plans/SCHEDULER_CLI_PLAN.md
-        - see /plans/plawright-config-plan.md
+        - see crawlcommand.go and implement the next step
     1. Playwright fetcher  
         - Investigate how to return network data 
         - add notes on play wright bot detection as readme
