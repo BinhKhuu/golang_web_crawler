@@ -36,3 +36,4 @@
 -Add a named sentinel error **only when**:
     - Callers need to check `errors.Is(err, ErrXxx)` for control flow decisions
     - The error represents a distinct, reusable domain condition
+- Plans should be concise even with at the expense of accuracy
