@@ -351,6 +351,33 @@ mockFn := func() (*sql.DB, error) { return nil, errors.New("Mock Error") }
 ```
 ---
 
+## 🖥️ binhcrawler CLI
+
+The `binhcrawler` command-line tool provides a configurable entry point for running crawl and parse jobs.
+
+### Domain Scoping
+
+The crawler auto-scopes to the target URL's domain. The first hostname label is stripped so subdomains are included in scope (e.g., `www.seek.com.au` allows crawling all of `*.seek.com.au`). Only one domain is derived per crawl command — multiple domains are not currently supported.
+
+### Usage
+
+```bash
+go run cmd/binhcrawler/main.go crawl [flags]
+```
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--url`, `-u` | (from config) | Target URL to crawl |
+| `--max-depth`, `-D` | `3` | Maximum crawl depth |
+| `--concurrency`, `-c` | `10` | Number of concurrent crawls |
+| `--mode`, `-m` | `sequential` | Execution mode: `sequential`, `concurrent`, `independent` |
+| `--parse` | false | Run parse job after crawl completes |
+| `--config`, `-f` | `configs/seek.json` | Path to site configuration JSON file |
+| `--query`, `-q` | (from config) | Search query override |
+| `--timeout`, `-t` | `0` | Playwright timeout in ms |
+
+---
+
 ## 🐛 playwright package
 
 playwright is used to 'smart crawl' - installation requires installing all the playwright dependencies:

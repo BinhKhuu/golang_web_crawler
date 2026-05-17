@@ -37,3 +37,5 @@
     - Callers need to check `errors.Is(err, ErrXxx)` for control flow decisions
     - The error represents a distinct, reusable domain condition
 - Plans should be concise even with at the expense of accuracy
+- when in plan mode create a plan file in `plans/` before starting and prompt me for a review
+- when testing database use sqlmock

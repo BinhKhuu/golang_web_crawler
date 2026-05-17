@@ -1,13 +1,21 @@
 package commands
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"golangwebcrawler/cmd/binhcrawler/internal/job"
+	"golangwebcrawler/internal/crawler"
 	"golangwebcrawler/internal/dbstore"
 	"golangwebcrawler/internal/fetcher/playwrightfetcher"
+	"golangwebcrawler/internal/storage"
 	"log/slog"
+	"net/url"
 	"os"
+	"strings"
+
+	crawlerparser "golangwebcrawler/internal/crawlerparser"
 )
 
 const (
@@ -59,15 +67,55 @@ func (c *CrawlCommand) Execute(_ []string) error {
 		c.Logger.Error("failed to build playwright config", "error", pwErr)
 		return pwErr
 	}
-	// TODO: pass pwConfig to orchestrator / fetcher creation
-	_ = pwConfig
 	// 4. Create CrawlJob with configured parameters
+	fetcher, fetchErr := playwrightfetcher.NewConfiguredPlaywrightFetcher(c.Logger, &pwConfig)
+	if fetchErr != nil {
+		c.Logger.Error("failed to create playwright fetcher", "error", fetchErr)
+		return fmt.Errorf("create playwright fetcher: %w", fetchErr)
+	}
+	defer fetcher.Close()
+
+	storageSvc := storage.NewService(db, c.Logger)
+
+	allowedDomains := extractAllowedDomains(pwConfig.URL)
+	crawlJob := newCrawlJob(pwConfig.URL, fetcher, storageSvc, c.MaxDepth, allowedDomains, c.Concurrency, c.Logger)
+	_ = crawlJob
+
 	// 5. If ParseAfter, also create ParseJob
 	// 6. Parse Mode string to orchestrator.Mode
 	// 7. Run orchestrator
 
 	c.Logger.Info("Finished crawl command")
 	return nil
+}
+
+// extractAllowedDomains derives the allowed domain from the target URL.
+// It strips the first hostname label so subdomains are included in scope
+// (e.g. "www.seek.com.au" -> "seek.com.au"). Returns []string to match
+// crawler.NewCrawler's allowedDomains parameter — only one domain is ever
+// derived from a single URL. Multiple domains would require an explicit CLI flag.
+func extractAllowedDomains(targetURL string) []string {
+	parsed, err := url.Parse(targetURL)
+	if err != nil {
+		return []string{}
+	}
+	host := parsed.Hostname()
+	if _, after, ok := strings.Cut(host, "."); ok {
+		return []string{after}
+	}
+	return []string{host}
+}
+
+func newCrawlJob(startURL string, fetcher crawler.Fetcher, stor *storage.Service, maxDepth int, allowedDomains []string, concurrency int, logger *slog.Logger) *job.CrawlJob {
+	crawlFn := func(ctx context.Context) error {
+		c := crawler.NewCrawler(maxDepth, allowedDomains, logger)
+		p := crawlerparser.NewHTTPParser()
+		return c.Crawl(ctx, startURL, fetcher, p, stor, concurrency)
+	}
+	return &job.CrawlJob{
+		ExecuteFn: crawlFn,
+		Logger:    logger,
+	}
 }
 
 func InitDb() (*sql.DB, error) {

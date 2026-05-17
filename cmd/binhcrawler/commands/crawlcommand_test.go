@@ -2,9 +2,13 @@ package commands
 
 import (
 	"bytes"
+	"context"
 	"database/sql"
 	"errors"
+	"golangwebcrawler/cmd/binhcrawler/internal/job"
+	"golangwebcrawler/internal/crawler"
 	"golangwebcrawler/internal/fetcher/playwrightfetcher"
+	"golangwebcrawler/internal/storage"
 	"log/slog"
 	"os"
 	"testing"
@@ -191,5 +195,94 @@ func TestBuildConfig_CustomPathError(t *testing.T) {
 	_, buildErr := buildPlaywrightFetcherConfig(cmd, newTestLogger())
 	if buildErr == nil {
 		t.Error("expected error for missing custom config but got nil")
+	}
+}
+
+func TestExtractAllowedDomains(t *testing.T) {
+	tests := []struct {
+		name     string
+		url      string
+		expected []string
+	}{
+		{
+			name:     "subdomain strips first label",
+			url:      "https://www.seek.com.au/jobs",
+			expected: []string{"seek.com.au"},
+		},
+		{
+			name:     "bare domain strips first label",
+			url:      "https://example.com",
+			expected: []string{"com"},
+		},
+		{
+			name:     "no subdomain single label",
+			url:      "http://localhost/path",
+			expected: []string{"localhost"},
+		},
+		{
+			name:     "invalid url returns empty",
+			url:      "://not-a-url",
+			expected: []string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := extractAllowedDomains(tt.url)
+			if len(result) != len(tt.expected) {
+				t.Fatalf("expected %d domains, got %d: %v", len(tt.expected), len(result), result)
+			}
+			for i, domain := range tt.expected {
+				if result[i] != domain {
+					t.Errorf("domain[%d]: expected %q, got %q", i, domain, result[i])
+				}
+			}
+		})
+	}
+}
+
+func TestNewCrawlJob(t *testing.T) {
+	mockFetcher := &mockFetcher{}
+	mockDB, _, mockErr := sqlmock.New()
+	if mockErr != nil {
+		t.Fatalf("failed to create sqlmock: %v", mockErr)
+	}
+	defer mockDB.Close()
+
+	stor := storage.NewService(mockDB, newTestLogger())
+	logger := newTestLogger()
+
+	j := newCrawlJob("https://example.com", mockFetcher, stor, 3, []string{"example.com"}, 5, logger)
+
+	if j == nil {
+		t.Fatal("expected non-nil CrawlJob")
+	}
+	if j.ExecuteFn == nil {
+		t.Error("expected ExecuteFn to be set")
+	}
+	if j.Logger != logger {
+		t.Error("expected Logger to match provided logger")
+	}
+}
+
+type mockFetcher struct{}
+
+func (m *mockFetcher) Fetch(_ context.Context, _ string) ([]crawler.FetchResult, error) {
+	return nil, nil
+}
+
+func TestNewCrawlJob_JobType(t *testing.T) {
+	mockFetcher := &mockFetcher{}
+	mockDB, _, mockErr := sqlmock.New()
+	if mockErr != nil {
+		t.Fatalf("failed to create sqlmock: %v", mockErr)
+	}
+
+	stor := storage.NewService(mockDB, newTestLogger())
+
+	j := newCrawlJob("https://example.com", mockFetcher, stor, 3, []string{"example.com"}, 5, newTestLogger())
+
+	if j.Type() != job.Crawl {
+		t.Errorf("expected JobType Crawl, got %v", j.Type())
 	}
 }
