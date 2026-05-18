@@ -190,18 +190,13 @@ func executeParse(ctx context.Context, cfg *ParseConfig) error {
 // NewDBParserCreator returns a function that creates a parser from the database.
 func NewDBParserCreator(db *sql.DB) func() (ParserJob, error) {
 	return func() (ParserJob, error) {
-		return NewDBParser(db)
+		return &DBParser{db: db}, nil
 	}
 }
 
 // DBParser wraps the generic parser for job listings.
 type DBParser struct {
 	db *sql.DB
-}
-
-// NewDBParser creates a new database-backed parser.
-func NewDBParser(db *sql.DB) (*DBParser, error) {
-	return &DBParser{db: db}, nil
 }
 
 // ParseLLM delegates to the underlying parser implementation.

@@ -471,12 +471,9 @@ func TestSetParseJobListing(t *testing.T) {
 		return nil, expectedErr
 	})
 
-	p, err := NewDBParser(nil)
-	if err != nil {
-		t.Fatalf("expected no error creating parser, got %v", err)
-	}
+	p := &DBParser{db: nil}
 
-	_, err = p.ParseLLM(t.Context(), "<html>test</html>")
+	_, err := p.ParseLLM(t.Context(), "<html>test</html>")
 	if err == nil {
 		t.Error("expected error, got nil")
 	}

@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"errors"
 	"golangwebcrawler/cmd/binhcrawler/internal/job"
+	"golangwebcrawler/cmd/binhcrawler/internal/orchestrator"
 	"golangwebcrawler/internal/crawler"
 	"golangwebcrawler/internal/fetcher/playwrightfetcher"
 	"golangwebcrawler/internal/storage"
@@ -284,5 +285,104 @@ func TestNewCrawlJob_JobType(t *testing.T) {
 
 	if j.Type() != job.Crawl {
 		t.Errorf("expected JobType Crawl, got %v", j.Type())
+	}
+}
+
+func TestParseMode_CaseInsensitive_Mode(t *testing.T) {
+	tests := []struct {
+		name     string
+		modeStr  string
+		expected orchestrator.Mode
+		wantErr  bool
+	}{
+		{
+			name:     "sequential lowercase",
+			modeStr:  "sequential",
+			expected: orchestrator.Sequential,
+		},
+		{
+			name:     "sequential uppercase",
+			modeStr:  "SEQUENTIAL",
+			expected: orchestrator.Sequential,
+		},
+		{
+			name:     "concurrent lowercase",
+			modeStr:  "concurrent",
+			expected: orchestrator.Concurrent,
+		},
+		{
+			name:     "concurrent uppercase",
+			modeStr:  "CONCURRENT",
+			expected: orchestrator.Concurrent,
+		},
+		{
+			name:     "independent lowercase",
+			modeStr:  "independent",
+			expected: orchestrator.Independent,
+		},
+		{
+			name:     "independent uppercase",
+			modeStr:  "INDEPENDENT",
+			expected: orchestrator.Independent,
+		},
+		{
+			name:     "empty string defaults to sequential",
+			modeStr:  "",
+			expected: orchestrator.Sequential,
+		},
+		{
+			name:    "invalid mode returns error",
+			modeStr: "parallel",
+			wantErr: true,
+		},
+		{
+			name:    "random string returns error",
+			modeStr: "foo",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mode, err := parseMode(tt.modeStr)
+			if tt.wantErr {
+				if err == nil {
+					t.Error("expected error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("expected no error, got %v", err)
+			}
+			if mode != tt.expected {
+				t.Errorf("expected mode %v (%s), got %v (%s)", tt.expected, tt.expected, mode, mode)
+			}
+		})
+	}
+}
+
+func TestNewParseJob(t *testing.T) {
+	mockDB, _, mockErr := sqlmock.New()
+	if mockErr != nil {
+		t.Fatalf("failed to create sqlmock: %v", mockErr)
+	}
+	defer mockDB.Close()
+
+	stor := storage.NewService(mockDB, newTestLogger())
+	logger := newTestLogger()
+
+	j := newParseJob(stor, mockDB, logger)
+
+	if j == nil {
+		t.Fatal("expected non-nil ParseJob")
+	}
+	if j.ExecuteFn == nil {
+		t.Error("expected ExecuteFn to be set")
+	}
+	if j.Logger != logger {
+		t.Error("expected Logger to match provided logger")
+	}
+	if j.Type() != job.Parse {
+		t.Errorf("expected JobType Parse, got %v", j.Type())
 	}
 }

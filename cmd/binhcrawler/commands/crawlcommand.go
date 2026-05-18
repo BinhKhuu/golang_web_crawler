@@ -6,14 +6,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"golangwebcrawler/cmd/binhcrawler/internal/job"
+	"golangwebcrawler/cmd/binhcrawler/internal/orchestrator"
 	"golangwebcrawler/internal/crawler"
 	"golangwebcrawler/internal/dbstore"
 	"golangwebcrawler/internal/fetcher/playwrightfetcher"
 	"golangwebcrawler/internal/storage"
+	"golangwebcrawler/internal/typeutil"
 	"log/slog"
 	"net/url"
 	"os"
 	"strings"
+	"time"
 
 	crawlerparser "golangwebcrawler/internal/crawlerparser"
 )
@@ -79,11 +82,31 @@ func (c *CrawlCommand) Execute(_ []string) error {
 
 	allowedDomains := extractAllowedDomains(pwConfig.URL)
 	crawlJob := newCrawlJob(pwConfig.URL, fetcher, storageSvc, c.MaxDepth, allowedDomains, c.Concurrency, c.Logger)
-	_ = crawlJob
+	jobs := []job.Job{crawlJob}
 
-	// 5. If ParseAfter, also create ParseJob
-	// 6. Parse Mode string to orchestrator.Mode
-	// 7. Run orchestrator
+	if c.ParseAfter {
+		parseJob := newParseJob(storageSvc, db, c.Logger)
+		jobs = append(jobs, parseJob)
+	}
+
+	mode, modeErr := parseMode(c.Mode)
+	if modeErr != nil {
+		c.Logger.Error("invalid execution mode", "error", modeErr)
+		return fmt.Errorf("parse mode: %w", modeErr)
+	}
+
+	orch := orchestrator.New(jobs, mode, c.Logger)
+
+	ctx := context.Background()
+	if pwConfig.Timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, time.Duration(pwConfig.Timeout)*time.Millisecond)
+		defer cancel()
+	}
+
+	if err := orch.Run(ctx); err != nil {
+		return fmt.Errorf("orchestrator run: %w", err)
+	}
 
 	c.Logger.Info("Finished crawl command")
 	return nil
@@ -115,6 +138,32 @@ func newCrawlJob(startURL string, fetcher crawler.Fetcher, stor *storage.Service
 	return &job.CrawlJob{
 		ExecuteFn: crawlFn,
 		Logger:    logger,
+	}
+}
+
+const defaultBatchSize = 100
+
+func newParseJob(stor *storage.Service, db *sql.DB, logger *slog.Logger) *job.ParseJob {
+	startTime := typeutil.UTCTimeNow().Add(-1 * time.Minute)
+	return job.NewParseJob(&job.ParseConfig{
+		Storage:   stor,
+		ParserFn:  job.NewDBParserCreator(db),
+		Logger:    logger,
+		StartDate: startTime,
+		BatchSize: defaultBatchSize,
+	})
+}
+
+func parseMode(modeStr string) (orchestrator.Mode, error) {
+	switch strings.ToLower(modeStr) {
+	case "", "sequential":
+		return orchestrator.Sequential, nil
+	case "concurrent":
+		return orchestrator.Concurrent, nil
+	case "independent":
+		return orchestrator.Independent, nil
+	default:
+		return orchestrator.Sequential, fmt.Errorf("invalid mode %q: must be sequential, concurrent, or independent", modeStr)
 	}
 }
 
