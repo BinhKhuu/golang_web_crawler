@@ -481,7 +481,7 @@ func (f *PlaywrightFetcher) configurePlaywrightBrowser() error {
 func DefaultConfig() PlaywrightFetcherConfig {
 	return PlaywrightFetcherConfig{
 		URL:      "https://www.seek.com.au",
-		Headless: true,
+		Headless: false,
 		Timeout:  defaultTimeout,
 		Search: SearchConfig{
 			InputSelectors: []string{

@@ -37,15 +37,19 @@ type CrawlCommand struct {
 	BaseCommand
 	GlobalOpts `group:"Global Options"`
 
-	URL         string `default:""                                                  description:"Target URL to crawl (overrides config file)"          long:"url"         short:"u"`
-	MaxDepth    int    `default:"3"                                                 description:"Maximum crawl depth"                                  long:"max-depth"   short:"D"`
-	Concurrency int    `default:"10"                                                description:"Number of concurrent crawls"                          long:"concurrency" short:"c"`
-	Mode        string `default:"sequential"                                        description:"Execution mode (sequential, concurrent, independent)" long:"mode"        short:"m"`
-	Headless    bool   `default:"true"                                              description:"Run browser in headless mode"                         long:"headless"`
-	Query       string `default:""                                                  description:"Search query (overrides config file)"                 long:"query"       short:"q"`
-	Timeout     int    `default:"0"                                                 description:"Playwright timeout in ms (overrides config file)"     long:"timeout"     short:"t"`
-	ParseAfter  bool   `description:"Automatically run parse after crawl completes" long:"parse"`
-	ConfigFile  string `default:"configs/seek.json"                                 description:"Path to site configuration JSON file"                 long:"config"      short:"f"`
+	URL         string `default:""           description:"Target URL to crawl (overrides config file)"          long:"url"         short:"u"`
+	MaxDepth    int    `default:"3"          description:"Maximum crawl depth"                                  long:"max-depth"   short:"D"`
+	Concurrency int    `default:"10"         description:"Number of concurrent crawls"                          long:"concurrency" short:"c"`
+	Mode        string `default:"sequential" description:"Execution mode (sequential, concurrent, independent)" long:"mode"        short:"m"`
+	// Headless defaults to false (headed mode) to avoid bot detection.
+	// Sites like Seek use browser fingerprinting; a visible browser window
+	// with a real user profile is less likely to be flagged as automated.
+	// Pass --headless to enable headless mode for CI/CD environments.
+	Headless   bool   `description:"Run browser in headless mode"                  long:"headless"`
+	Query      string `default:""                                                  description:"Search query (overrides config file)"             long:"query"   short:"q"`
+	Timeout    int    `default:"0"                                                 description:"Playwright timeout in ms (overrides config file)" long:"timeout" short:"t"`
+	ParseAfter bool   `description:"Automatically run parse after crawl completes" long:"parse"`
+	ConfigFile string `default:"configs/seek.json"                                 description:"Path to site configuration JSON file"             long:"config"  short:"f"`
 }
 
 func (c *CrawlCommand) Execute(_ []string) error {
@@ -196,6 +200,9 @@ func buildPlaywrightFetcherConfig(c *CrawlCommand, logger *slog.Logger) (playwri
 	}
 	if c.Query != "" {
 		config.Search.Query = c.Query
+	}
+	if c.Headless {
+		config.Headless = c.Headless
 	}
 
 	return config, nil

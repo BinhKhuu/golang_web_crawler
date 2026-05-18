@@ -112,7 +112,7 @@ graph TB
 | MaxDepth | `-D` | `--max-depth` | int | `3` | Maximum crawl depth |
 | Concurrency | `-c` | `--concurrency` | int | `10` | Number of concurrent crawls |
 | Mode | `-m` | `--mode` | string | `"sequential"` | Execution mode (sequential, concurrent, independent) |
-| Headless | - | `--headless` | bool | `true` | Run browser in headless mode |
+| Headless | - | `--headless` | bool | `false` | Run browser in headless mode (default: headed to avoid bot detection) |
 | Query | `-q` | `--query` | string | `"Software Engineer Jobs"` | Search query |
 | Timeout | `-t` | `--timeout` | int | `10000` | Playwright timeout in ms |
 | ParseAfter | - | `--parse` | bool | `false` | Automatically run parse after crawl completes |
@@ -169,7 +169,7 @@ type CrawlCommand struct {
     MaxDepth    int    `short:"D" long:"max-depth" description:"Maximum crawl depth" default:"3"`
     Concurrency int    `short:"c" long:"concurrency" description:"Number of concurrent crawls" default:"10"`
     Mode        string `short:"m" long:"mode" description:"Execution mode (sequential, concurrent, independent)" default:"sequential"`
-    Headless    bool   `long:"headless" description:"Run browser in headless mode" default:"true"`
+    Headless    bool   `long:"headless" description:"Run browser in headless mode (default: headed to avoid bot detection)"`
     Query       string `short:"q" long:"query" description:"Search query" default:"Software Engineer Jobs"`
     Timeout     int    `short:"t" long:"timeout" description:"Playwright timeout in ms" default:"10000"`
     ParseAfter  bool   `long:"parse" description:"Automatically run parse after crawl completes"`

@@ -24,7 +24,7 @@ func GetSeekConfiguration() PlaywrightFetcherConfig {
 	return PlaywrightFetcherConfig{
 		// Target
 		URL:      seekSoftwareEngineerJobsURL,
-		Headless: true,
+		Headless: false,
 		Timeout:  defaultTimeout,
 
 		// Search interaction: fill input, submit, then wait for results

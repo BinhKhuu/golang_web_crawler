@@ -1,6 +1,6 @@
 {
   "url": "https://www.seek.com.au/software-engineer-jobs",
-  "headless": true,
+  "headless": false,
   "timeout": 10000,
   "search": {
     "inputSelectors": ["input[name=keywords]", "input[placeholder*='Search']"],
