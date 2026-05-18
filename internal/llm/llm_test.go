@@ -2,18 +2,17 @@ package llm
 
 import (
 	"context"
+	"golangwebcrawler/internal/env"
 	"golangwebcrawler/internal/models"
 	"log"
 	"os"
 	"testing"
-
-	"github.com/joho/godotenv"
 )
 
 var runLLMTest = false
 
 func TestMain(m *testing.M) {
-	if err := godotenv.Load("../../.env"); err != nil {
+	if err := env.LoadEnv(); err != nil {
 		log.Println("No .env file found, falling back to system env")
 	}
 	runLLMTest = os.Getenv("RUN_LLM_TESTS") == "1"

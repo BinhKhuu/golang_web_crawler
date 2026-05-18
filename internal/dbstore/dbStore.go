@@ -5,9 +5,12 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"golangwebcrawler/internal/env"
 	"net"
 	"os"
 	"time"
+
+	_ "github.com/lib/pq"
 )
 
 const (
@@ -63,6 +66,10 @@ func GetConnectionString() (string, error) {
 }
 
 func SetupDatabase() (*sql.DB, error) {
+	if err := env.LoadEnv(); err != nil {
+		return nil, fmt.Errorf("failed to load .env: %w", err)
+	}
+
 	conStr, err := GetConnectionString()
 	ctx, cancel := context.WithTimeout(context.Background(), QueryTimeout)
 	defer cancel()

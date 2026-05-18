@@ -20,6 +20,9 @@ func Test_GetConnectionString(t *testing.T) {
 }
 
 func Test_GetConnectionString_MissingEnv(t *testing.T) {
+	testhelpers.SetTestEnvs(t)
+	os.Unsetenv("DB_NAME")
+
 	_, err := GetConnectionString()
 	if err == nil {
 		t.Error("expected error when env vars are missing")

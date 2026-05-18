@@ -274,12 +274,107 @@ go run cmd/scheduler/main.go
 
 ---
 
+## 📁 Project Structure & Root Detection
+
+### Project Root Marker
+
+The project root is identified by the presence of a `.project-root` marker file at the repository root. This explicit marker is used by [`internal/env/env.go`](internal/env/env.go) to detect the project boundary.
+
+**Detection Logic:**
+1. Checks current working directory for `.project-root`
+2. Searches upward from current directory to parent directories
+3. Falls back to searching from the calling package's location
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| [`.project-root`](.project-root) | Marker file identifying the project root directory |
+| [`go.mod`](go.mod) | Go module definition and dependencies |
+| [`.env`](.env) | Environment variables (not tracked in Git) |
+| [`docker-compose.yaml`](docker-compose.yaml) | Docker services configuration (PostgreSQL, Ollama) |
+| [`.golangci.yaml`](.golangci.yaml) | Go linter configuration |
+| [`.gitignore`](.gitignore) | Git ignore rules |
+
+---
+
 ## 📚 Additional Documentation
 
 - [`MIGRATIONS.md`](MIGRATIONS.md) - Database migration guide
 - [`OLLAMA.md`](OLLAMA.md) - Ollama LLM setup guide
 - [`DOCKER.md`](DOCKER.md) - Docker configuration guide
 - [`TESTING.md`](TESTING.md) - Testing guide
+
+---
+
+## ⚠️ Error Handling Guidelines
+
+### When to Use Named Sentinel Errors (`var ErrXxx = errors.New(...)`)
+
+Add a named sentinel error **only when**:
+- Callers need to check `errors.Is(err, ErrXxx)` for control flow decisions
+- The error represents a distinct, reusable domain condition
+
+Examples in this project:
+- [`ErrNoJson`](internal/llm/llm.go:19) — callers check `errors.Is(err, ErrNoJson)`
+- [`ErrUnsupportedParserType`](internal/parser/parser.go:18) — callers check `errors.Is(err, ErrUnsupportedParserType)`
+
+### When to Use Inline Errors (`errors.New(...)`)
+
+Use inline `errors.New()` for:
+- One-off errors that are just logged and returned as-is (no `errors.Is()` checks)
+- Test mocks and test assertions
+- Configuration errors (e.g., missing environment variables in `internal/dbstore/`)
+
+Examples:
+- `"DB_USER environment variable is not set"` in [`internal/dbstore/dbStore.go`](internal/dbstore/dbStore.go)
+- `"fetch error"` in test mocks
+
+### Anti-Pattern: Unnecessary Named Errors
+
+Don't add named errors just for the sake of having them. If no caller checks `errors.Is(err, ErrXxx)`, a named error adds boilerplate without benefit. For example, in [`crawlcommand.go`](cmd/binhcrawler/commands/crawlcommand.go), the `InitDb()` and `db.Close()` errors are just logged and passed through — no named error needed.
+
+### Error Handling Pattern
+
+```go
+// Good: Named sentinel for callers to check
+var ErrConnectionFailed = errors.New("database connection failed")
+
+// Good: Inline for logging-only or test cases
+if err := db.Ping(); err != nil {
+    logger.Error("failed to ping database", "error", err)
+    return errors.New("database connection failed")
+}
+
+// Good: Test mocks use inline errors
+mockFn := func() (*sql.DB, error) { return nil, errors.New("Mock Error") }
+```
+---
+
+## 🖥️ binhcrawler CLI
+
+The `binhcrawler` command-line tool provides a configurable entry point for running crawl and parse jobs.
+
+### Domain Scoping
+
+The crawler auto-scopes to the target URL's domain. The first hostname label is stripped so subdomains are included in scope (e.g., `www.seek.com.au` allows crawling all of `*.seek.com.au`). Only one domain is derived per crawl command — multiple domains are not currently supported.
+
+### Usage
+
+```bash
+go run cmd/binhcrawler/main.go crawl [flags]
+```
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--url`, `-u` | (from config) | Target URL to crawl |
+| `--max-depth`, `-D` | `3` | Maximum crawl depth |
+| `--concurrency`, `-c` | `10` | Number of concurrent crawls |
+| `--mode`, `-m` | `sequential` | Execution mode: `sequential`, `concurrent`, `independent` |
+| `--parse` | false | Run parse job after crawl completes |
+| `--config`, `-f` | `configs/seek.json` | Path to site configuration JSON file |
+| `--query`, `-q` | (from config) | Search query override |
+| `--timeout`, `-t` | `0` | Playwright timeout in ms |
 
 ---
 
