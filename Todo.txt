@@ -1,6 +1,5 @@
 todo: 
-    1. Scheduler turn into a CMD application with goflags 
-        - see crawlcommand.go and implement the next step
+    1. Playwright fetcher allow navigating multiple pages
     1. Playwright fetcher  
         - Investigate how to return network data 
         - add notes on play wright bot detection as readme
