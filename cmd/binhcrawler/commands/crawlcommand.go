@@ -101,14 +101,7 @@ func (c *CrawlCommand) Execute(_ []string) error {
 
 	orch := orchestrator.New(jobs, mode, c.Logger)
 
-	ctx := context.Background()
-	if pwConfig.Timeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, time.Duration(pwConfig.Timeout)*time.Millisecond)
-		defer cancel()
-	}
-
-	if err := orch.Run(ctx); err != nil {
+	if err := orch.Run(context.Background()); err != nil {
 		return fmt.Errorf("orchestrator run: %w", err)
 	}
 

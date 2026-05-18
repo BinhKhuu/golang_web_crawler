@@ -143,6 +143,49 @@ func TestOrchestrator_Sequential_JobFailure(t *testing.T) {
 	}
 }
 
+func TestOrchestrator_Sequential_SlowJobCompletesWithoutTimeout(t *testing.T) {
+	var order []string
+	requestWait := 11000 * time.Millisecond
+	mu := sync.Mutex{}
+
+	slowCrawl := &mockJob{
+		jobType: job.Crawl,
+		execute: func(ctx context.Context) error {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(requestWait):
+				mu.Lock()
+				order = append(order, crawlLabel)
+				mu.Unlock()
+				return nil
+			}
+		},
+	}
+
+	parse := &mockJob{
+		jobType: job.Parse,
+		execute: func(ctx context.Context) error {
+			mu.Lock()
+			order = append(order, parseLabel)
+			mu.Unlock()
+			return nil
+		},
+	}
+
+	orch := New([]job.Job{slowCrawl, parse}, Sequential, slog.Default())
+	if err := orch.Run(context.Background()); err != nil {
+		t.Fatalf("expected no error with context.Background(), got %v", err)
+	}
+
+	if len(order) != 2 {
+		t.Fatalf("expected 2 jobs to run, got %d", len(order))
+	}
+	if order[0] != crawlLabel || order[1] != parseLabel {
+		t.Errorf("expected [crawl, parse], got %v", order)
+	}
+}
+
 func TestOrchestrator_Sequential_ContextCancelled(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
