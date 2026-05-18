@@ -52,6 +52,7 @@ jobs:
           DB_USER: myuser
           DB_PASSWORD: mypassword
           DB_NAME: jobs_webcrawler
+          DB_SSLMODE: disable
         run: go test ./... -v -coverprofile=coverage.out
 
       - name: Add coverage summary to job summary
