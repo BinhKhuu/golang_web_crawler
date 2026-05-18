@@ -5,6 +5,7 @@ import (
 	"golangwebcrawler/cmd/binhcrawler/commands"
 	"golangwebcrawler/internal/env"
 	"log"
+	"log/slog"
 	"os"
 
 	"github.com/jessevdk/go-flags"
@@ -29,7 +30,8 @@ func main() {
 
 func BuildParser() (*flags.Parser, error) {
 	baseCommand := &commands.BaseCommand{
-		Out: os.Stdout,
+		Out:    os.Stdout,
+		Logger: slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})),
 	}
 
 	parser := flags.NewParser(nil, flags.Default)
