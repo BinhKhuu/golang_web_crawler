@@ -554,6 +554,7 @@ func Test_HasPaginationSection(t *testing.T) {
 
 func setup_paginationTest(t *testing.T) (*PlaywrightFetcher, playwright.Page) {
 	f := createMockFetcher()
+	f.fetchConfig.Timeout = 5000
 	f.fetchConfig.Pagination.ContainerSelectors = []string{paginationSelectors}
 	ts, err := createPaginationTestServer(t)
 	if err != nil {
@@ -617,7 +618,102 @@ func Test_IsNextDisabled(t *testing.T) {
 	}
 }
 
-// clickNextPageWithRetry
+func Test_ClickNextPageWithRetry(t *testing.T) {
+	tc := []struct {
+		name                string
+		nextSelectors       []string
+		strategy            string
+		clicks              int
+		expectedErr         bool
+		assertLastPageState bool
+	}{
+		{
+			name:                "navigates to last page with valid selector",
+			nextSelectors:       []string{paginationSelectors},
+			strategy:            "",
+			clicks:              2,
+			expectedErr:         false,
+			assertLastPageState: true,
+		},
+		{
+			name:                "returns error when selectors are not configured",
+			nextSelectors:       nil,
+			strategy:            paginationStrategyNext,
+			clicks:              1,
+			expectedErr:         true,
+			assertLastPageState: false,
+		},
+		{
+			name:                "returns error when selectors are invalid",
+			nextSelectors:       []string{".missing-next-button"},
+			strategy:            paginationStrategyNext,
+			clicks:              1,
+			expectedErr:         true,
+			assertLastPageState: false,
+		},
+	}
+
+	for _, tt := range tc {
+		t.Run(tt.name, func(t *testing.T) {
+			f, p := setup_paginationTest(t)
+			defer f.Close()
+			defer func() {
+				if closeErr := p.Close(); closeErr != nil {
+					t.Logf("error closing page: %v", closeErr)
+				}
+			}()
+
+			f.fetchConfig.Pagination.MaxRetries = 3
+			f.fetchConfig.Pagination.NextSelectors = tt.nextSelectors
+			f.fetchConfig.Pagination.Strategy = tt.strategy
+
+			var err error
+			for i := 0; i < tt.clicks; i++ {
+				err = f.clickNextPageWithRetry(t.Context(), p)
+				if err != nil {
+					break
+				}
+			}
+
+			if (err != nil) != tt.expectedErr {
+				t.Fatalf("expected error=%t, got err=%v", tt.expectedErr, err)
+			}
+
+			if !tt.assertLastPageState {
+				return
+			}
+
+			if waitErr := p.Locator("span.disabled").First().WaitFor(playwright.LocatorWaitForOptions{
+				State:   playwright.WaitForSelectorStateVisible,
+				Timeout: playwright.Float(5000),
+			}); waitErr != nil {
+				t.Fatalf("waiting for last page state: %v", waitErr)
+			}
+
+			finalURL := p.URL()
+			if !strings.Contains(finalURL, "#page=3") {
+				t.Errorf("expected final URL to contain #page=3, got %s", finalURL)
+			}
+
+			pageInfo, _ := p.Locator(".page-info").TextContent()
+			if pageInfo != "Page 3 of 3" {
+				t.Errorf("expected page info 'Page 3 of 3', got %q", pageInfo)
+			}
+
+			jobTitles, _ := p.Locator("a[data-automation='jobTitle']").AllTextContents()
+			expectedJobs := []string{"Frontend Architect"}
+			if len(jobTitles) != len(expectedJobs) {
+				t.Errorf("expected %d jobs, got %d", len(expectedJobs), len(jobTitles))
+			}
+
+			nextDisabled, _ := p.Locator("span.disabled").Count()
+			if nextDisabled == 0 {
+				t.Error("expected disabled next button on last page")
+			}
+		})
+	}
+}
+
 // waitForNextPageLoad
 // clickNextButton
 // clickNextPageNumber

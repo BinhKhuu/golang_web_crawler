@@ -121,6 +121,22 @@ func configurePlaywright(f *PlaywrightFetcher, logger *slog.Logger) (*Playwright
 	return f, nil
 }
 
+func (f *PlaywrightFetcher) timeoutInMs() float64 {
+	if f.fetchConfig != nil && f.fetchConfig.Timeout > 0 {
+		return float64(f.fetchConfig.Timeout)
+	}
+	return float64(defaultTimeout)
+}
+
+// clickWithTimeout passes the timeout explicitly because relying on Playwright
+// defaults in these retry-heavy paths led to slow failures for missing or
+// invalid selectors.
+func (f *PlaywrightFetcher) clickWithTimeout(locator playwright.Locator) error {
+	return locator.Click(playwright.LocatorClickOptions{
+		Timeout: playwright.Float(f.timeoutInMs()),
+	})
+}
+
 func (f *PlaywrightFetcher) Fetch(ctx context.Context, url string) ([]crawler.FetchResult, error) {
 	return f.fetchFn(ctx, url)
 }
@@ -141,13 +157,12 @@ func (f *PlaywrightFetcher) FetchDefault(ctx context.Context, url string) ([]cra
 		}
 	}()
 
-	const timeoutInMs = 30000
 	if ctxErr := ctx.Err(); ctxErr != nil {
 		return []crawler.FetchResult{}, ctxErr
 	}
 	_, err = p.Goto(url, playwright.PageGotoOptions{
 		WaitUntil: playwright.WaitUntilStateNetworkidle,
-		Timeout:   playwright.Float(timeoutInMs),
+		Timeout:   playwright.Float(f.timeoutInMs()),
 	})
 	if err != nil {
 		return []crawler.FetchResult{}, err
@@ -199,12 +214,11 @@ func (f *PlaywrightFetcher) FetchSPAConfig(ctx context.Context, url string) ([]c
 		return []crawler.FetchResult{}, errors.New("fetch config is nil")
 	}
 
-	const timeoutInMs = 30000
 	if ctxErr := ctx.Err(); ctxErr != nil {
 		return []crawler.FetchResult{}, ctxErr
 	}
 	_, err = p.Goto(url, playwright.PageGotoOptions{
-		Timeout: playwright.Float(timeoutInMs),
+		Timeout: playwright.Float(f.timeoutInMs()),
 	})
 	if err != nil {
 		return []crawler.FetchResult{}, err
@@ -341,18 +355,17 @@ func (f *PlaywrightFetcher) waitAndCollectResults(ctx context.Context, p playwri
 }
 
 func waitForElementVisibility(f *PlaywrightFetcher, p playwright.Page, sel string) error {
-	timeout := float64(f.fetchConfig.Timeout)
 	locator := p.Locator(sel)
 	err := locator.First().WaitFor(playwright.LocatorWaitForOptions{
 		State:   playwright.WaitForSelectorStateVisible,
-		Timeout: playwright.Float(timeout),
+		Timeout: playwright.Float(f.timeoutInMs()),
 	})
 	return err
 }
 
 func (f *PlaywrightFetcher) fetchSPAConfigClickAction(ctx context.Context, entry playwright.Locator, p playwright.Page) ([]crawler.FetchResult, error) {
 	id := f.createFetchID(entry, p)
-	err := entry.Click()
+	err := f.clickWithTimeout(entry)
 	if err != nil {
 		f.logger.Error("error clicking entry", "error", err)
 		return nil, err
@@ -549,7 +562,12 @@ func (f *PlaywrightFetcher) clickNextPageWithRetry(ctx context.Context, p playwr
 
 func (f *PlaywrightFetcher) clickNextButton(p playwright.Page) bool {
 	for _, sel := range f.fetchConfig.Pagination.NextSelectors {
-		err := p.Locator(sel).Click()
+		locator := p.Locator(sel)
+		count, err := locator.Count()
+		if err != nil || count == 0 {
+			continue
+		}
+		err = f.clickWithTimeout(locator.First())
 		if err == nil {
 			return true
 		}
@@ -571,7 +589,7 @@ func (f *PlaywrightFetcher) clickNextPageNumber(p playwright.Page) bool {
 			if strings.TrimSpace(text) == "" {
 				continue
 			}
-			err := entry.Click()
+			err := f.clickWithTimeout(entry)
 			if err == nil {
 				return true
 			}
@@ -590,11 +608,10 @@ func (f *PlaywrightFetcher) waitForNextPageLoad(ctx context.Context, p playwrigh
 			return ctxErr
 		}
 
-		timeout := float64(f.fetchConfig.Timeout)
 		locator := p.Locator(sel)
 		err := locator.First().WaitFor(playwright.LocatorWaitForOptions{
 			State:   playwright.WaitForSelectorStateVisible,
-			Timeout: playwright.Float(timeout),
+			Timeout: playwright.Float(f.timeoutInMs()),
 		})
 		if err == nil {
 			return nil
@@ -649,6 +666,8 @@ func (f *PlaywrightFetcher) configurePlaywrightBrowser() error {
 		b.Close()
 		return err
 	}
+	bctx.SetDefaultTimeout(f.timeoutInMs())
+	bctx.SetDefaultNavigationTimeout(f.timeoutInMs())
 
 	// 3. Enhanced stealth scripts
 	err = bctx.AddInitScript(playwright.Script{
