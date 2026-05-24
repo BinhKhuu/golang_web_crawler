@@ -3,12 +3,14 @@ package playwrightfetcher
 import (
 	"context"
 	"fmt"
+	"golangwebcrawler/internal/crawler"
 	"golangwebcrawler/internal/env"
 	"log"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 	"unicode/utf8"
 
@@ -158,6 +160,89 @@ func createMockFetcher() *PlaywrightFetcher {
 		fetchConfig: &PlaywrightFetcherConfig{},
 	}
 	return f
+}
+
+func Test_WaitAndCollectResults_AndfetchSPAConfigPageSelectors(t *testing.T) {
+	tc := []struct {
+		name                string
+		pageSelectors       *PaginationConfig
+		expectedResultCount int
+	}{
+		{
+			name: "should navigate pages",
+			pageSelectors: &PaginationConfig{
+				ContainerSelectors: []string{"[data-automation='pagination-next']"},
+				NextSelectors:      []string{"[data-automation='pagination-next']"},
+				DisabledSelector:   "button[disabled]",
+				WaitForSelectors:   []string{"a[data-automation='jobTitle']"},
+				Strategy:           "auto",
+				MaxRetries:         2,
+				MaxPages:           3,
+			},
+			expectedResultCount: 2,
+		},
+	}
+
+	for _, tt := range tc {
+		t.Run(tt.name, func(t *testing.T) {
+			htmlBytes, err := os.ReadFile("./testdata/pagination_html")
+			if err != nil {
+				t.Fatalf("failed to read HTML file: %v", err)
+			}
+
+			ts := createTestHttpServer(string(htmlBytes))
+
+			f := createMockFetcher()
+			f.fetchConfig.Pagination = *tt.pageSelectors
+
+			err = f.configurePlaywrightBrowser()
+			if err != nil {
+				t.Fatalf("configurePlaywrightBrowser() error: %v", err)
+			}
+			defer f.Close()
+
+			p, _ := f.browserCtx.NewPage()
+
+			mockFn := func(ctx context.Context, p playwright.Page) ([]crawler.FetchResult, error) {
+				return []crawler.FetchResult{}, nil
+			}
+			pOpts := playwright.PageGotoOptions{}
+			_, err = p.Goto(ts.URL, pOpts)
+			if err != nil {
+				t.Fatalf("page.Goto() error = %v", err)
+			}
+
+			_, err = collectPageResults(t.Context(), f, p, mockFn)
+			if err != nil {
+				t.Fatalf("collected page results error: %v", err)
+			}
+
+			// Page URL changed to last page
+			finalUrl := p.URL()
+			if !strings.Contains(finalUrl, "#page=3") {
+				t.Errorf("expected final URL to contain #page=3, got %s", finalUrl)
+			}
+
+			// Page info text updated
+			pageInfo, _ := p.Locator(".page-info").TextContent()
+			if pageInfo != "Page 3 of 3" {
+				t.Errorf("expected page info 'Page 3 of 3', got %q", pageInfo)
+			}
+
+			// Job titles changed to page 3 content
+			jobTitles, _ := p.Locator("a[data-automation='jobTitle']").AllTextContents()
+			expectedJobs := []string{"Frontend Architect"}
+			if len(jobTitles) != len(expectedJobs) {
+				t.Errorf("expected %d jobs, got %d", len(expectedJobs), len(jobTitles))
+			}
+
+			// Next button is now disabled (DOM element changed)
+			nextDisabled, _ := p.Locator("span.disabled").Count()
+			if nextDisabled == 0 {
+				t.Error("expected disabled next button on last page")
+			}
+		})
+	}
 }
 
 func Test_WaitAndCollectResults_AndfetchSPAConfigDataSelectors(t *testing.T) {
@@ -357,3 +442,83 @@ func Test_CanonicalizeFetchedURL(t *testing.T) {
 		})
 	}
 }
+
+func Test_ShouldStopPagination(t *testing.T) {
+	tc := []struct {
+		name         string
+		maxItems     int
+		resultsCount int
+		expectedStop bool
+	}{
+		{
+			name:         "returns false when MaxItems is zero",
+			maxItems:     0,
+			resultsCount: 5,
+			expectedStop: false,
+		},
+		{
+			name:         "returns false when MaxItems is negative",
+			maxItems:     -1,
+			resultsCount: 5,
+			expectedStop: false,
+		},
+		{
+			name:         "returns false when results below limit",
+			maxItems:     5,
+			resultsCount: 3,
+			expectedStop: false,
+		},
+		{
+			name:         "returns true when results equal limit",
+			maxItems:     5,
+			resultsCount: 5,
+			expectedStop: true,
+		},
+		{
+			name:         "returns true when results exceed limit",
+			maxItems:     5,
+			resultsCount: 10,
+			expectedStop: true,
+		},
+		{
+			name:         "returns false when results empty and limit set",
+			maxItems:     5,
+			resultsCount: 0,
+			expectedStop: false,
+		},
+		{
+			name:         "returns true when single result meets limit of 1",
+			maxItems:     1,
+			resultsCount: 1,
+			expectedStop: true,
+		},
+	}
+
+	for _, tt := range tc {
+		t.Run(tt.name, func(t *testing.T) {
+			f := createMockFetcher()
+			f.fetchConfig.MaxItems = tt.maxItems
+
+			results := make([]crawler.FetchResult, tt.resultsCount)
+			for i := range results {
+				results[i] = crawler.FetchResult{
+					URL:        fmt.Sprintf("https://example.com/job/%d", i+1),
+					StatusCode: http.StatusOK,
+					Body:       []byte(""),
+				}
+			}
+
+			stop := f.shouldStopPagination(results)
+			if stop != tt.expectedStop {
+				t.Fatalf("expected %t, got %t", tt.expectedStop, stop)
+			}
+		})
+	}
+}
+
+// isNextDisabled
+// clickNextPageWithRetry
+// waitForNextPageLoad
+// clickNextButton
+// clickNextPageNumber
+// waitForNextPageLoad

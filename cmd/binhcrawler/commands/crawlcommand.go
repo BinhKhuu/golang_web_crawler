@@ -46,10 +46,11 @@ type CrawlCommand struct {
 	// with a real user profile is less likely to be flagged as automated.
 	// Pass --headless to enable headless mode for CI/CD environments.
 	Headless   bool   `description:"Run browser in headless mode"                  long:"headless"`
-	Query      string `default:""                                                  description:"Search query (overrides config file)"             long:"query"   short:"q"`
-	Timeout    int    `default:"0"                                                 description:"Playwright timeout in ms (overrides config file)" long:"timeout" short:"t"`
+	Query      string `default:""                                                  description:"Search query (overrides config file)"             long:"query"     short:"q"`
+	Timeout    int    `default:"0"                                                 description:"Playwright timeout in ms (overrides config file)" long:"timeout"   short:"t"`
+	MaxItems   int    `default:"0"                                                 description:"Max items to scrape (0 = unlimited)"              long:"max-items"`
 	ParseAfter bool   `description:"Automatically run parse after crawl completes" long:"parse"`
-	ConfigFile string `default:"configs/seek.json"                                 description:"Path to site configuration JSON file"             long:"config"  short:"f"`
+	ConfigFile string `default:"configs/seek.json"                                 description:"Path to site configuration JSON file"             long:"config"    short:"f"`
 }
 
 func (c *CrawlCommand) Execute(_ []string) error {
@@ -196,6 +197,9 @@ func buildPlaywrightFetcherConfig(c *CrawlCommand, logger *slog.Logger) (playwri
 	}
 	if c.Headless {
 		config.Headless = c.Headless
+	}
+	if c.MaxItems > 0 {
+		config.MaxItems = c.MaxItems
 	}
 
 	return config, nil

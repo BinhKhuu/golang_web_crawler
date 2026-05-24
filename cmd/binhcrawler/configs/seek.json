@@ -14,5 +14,15 @@
   "canonicalization": {
     "ignoreQueryParams": ["sol", "ref", "origin"],
     "rootRelativePrefixes": ["job/"]
-  }
+  },
+  "pagination": {
+    "containerSelectors": ["[data-automation='pagination']"],
+    "nextSelectors": ["button[data-automation='pagination-next']"],
+    "disabledSelector": "button[disabled]",
+    "waitForSelectors": ["a[data-automation='jobTitle']"],
+    "strategy": "auto",
+    "maxRetries": 2,
+    "maxPages": 5
+  },
+  "maxItems": 0
 }

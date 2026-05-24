@@ -1,0 +1,70 @@
+<html>
+<head><title>Jobs</title></head>
+<body>
+    <div id="job-listings"></div>
+    <nav id="pagination"></nav>
+
+    <script>
+        const pages = {
+            "1": {
+                jobs: [
+                    { title: "Software Engineer I", id: "/job/101", details: "Full details for job 101" },
+                    { title: "Senior Developer", id: "/job/102", details: "Full details for job 102" }
+                ],
+                totalPages: 3,
+                pageInfo: "Page 1 of 3"
+            },
+            "2": {
+                jobs: [
+                    { title: "DevOps Engineer", id: "/job/103", details: "Full details for job 103" },
+                    { title: "Backend Developer", id: "/job/104", details: "Full details for job 104" }
+                ],
+                totalPages: 3,
+                pageInfo: "Page 2 of 3"
+            },
+            "3": {
+                jobs: [
+                    { title: "Frontend Architect", id: "/job/105", details: "Full details for job 105" }
+                ],
+                totalPages: 3,
+                pageInfo: "Page 3 of 3"
+            }
+        };
+
+        function render() {
+            const hash = window.location.hash || "#page=1";
+            const pageNum = parseInt(hash.replace("#page=", "")) || 1;
+            const data = pages[String(pageNum)] || pages["1"];
+
+            // Render jobs
+            let html = '<div class="job-listings">';
+            data.jobs.forEach(job => {
+                html += `<a data-automation="jobTitle" href="${job.id}">${job.title}</a>`;
+                html += `<div data-automation="jobDetailsPage">${job.details}</div>`;
+            });
+            html += '</div>';
+
+            // Render pagination
+            html += '<nav data-automation="pagination">';
+            html += `<span class="page-info">${data.pageInfo}</span>`;
+
+            if (pageNum < data.totalPages) {
+                html += `<a href="#page=${pageNum + 1}" data-automation="pagination-next">Next</a>`;
+            } else {
+                html += `<span data-automation="pagination-next" class="disabled">Next</span>`;
+            }
+
+            for (let i = 1; i <= data.totalPages; i++) {
+                html += `<a href="#page=${i}" data-automation="pageNumber">${i}</a>`;
+            }
+            html += '</nav>';
+
+            document.getElementById('job-listings').innerHTML = html;
+            document.getElementById('pagination').innerHTML = html.match(/<nav[^>]*>[\\s\\S]*<\/nav>/)?.[0] || '';
+        }
+
+        window.addEventListener('hashchange', render);
+        render();
+    </script>
+</body>
+</html>

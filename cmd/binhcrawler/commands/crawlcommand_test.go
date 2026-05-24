@@ -423,3 +423,115 @@ func TestNewParseJob(t *testing.T) {
 		t.Errorf("expected JobType Parse, got %v", j.Type())
 	}
 }
+
+func TestLoadJSONConfig_Pagination(t *testing.T) {
+	jsonContent := `{
+		"url": "https://example.com",
+		"pagination": {
+			"containerSelectors": [".pagination"],
+			"nextSelectors": [".next-btn"],
+			"disabledSelector": ".disabled",
+			"waitForSelectors": [".results"],
+			"strategy": "next-button",
+			"maxRetries": 3
+		},
+		"maxItems": 50
+	}`
+	path := createTempJSON(t, jsonContent)
+
+	var config playwrightfetcher.PlaywrightFetcherConfig
+	if err := loadJSONConfig(path, &config); err != nil {
+		t.Fatalf("expected no error but got %v", err)
+	}
+
+	if len(config.Pagination.ContainerSelectors) != 1 || config.Pagination.ContainerSelectors[0] != ".pagination" {
+		t.Errorf("expected ContainerSelectors [.pagination] but got %v", config.Pagination.ContainerSelectors)
+	}
+	if len(config.Pagination.NextSelectors) != 1 || config.Pagination.NextSelectors[0] != ".next-btn" {
+		t.Errorf("expected NextSelectors [.next-btn] but got %v", config.Pagination.NextSelectors)
+	}
+	if config.Pagination.DisabledSelector != ".disabled" {
+		t.Errorf("expected DisabledSelector '.disabled' but got %s", config.Pagination.DisabledSelector)
+	}
+	if len(config.Pagination.WaitForSelectors) != 1 || config.Pagination.WaitForSelectors[0] != ".results" {
+		t.Errorf("expected WaitForSelectors [.results] but got %v", config.Pagination.WaitForSelectors)
+	}
+	if config.Pagination.Strategy != "next-button" {
+		t.Errorf("expected Strategy 'next-button' but got %s", config.Pagination.Strategy)
+	}
+	if config.Pagination.MaxRetries != 3 {
+		t.Errorf("expected MaxRetries 3 but got %d", config.Pagination.MaxRetries)
+	}
+	if config.MaxItems != 50 {
+		t.Errorf("expected MaxItems 50 but got %d", config.MaxItems)
+	}
+}
+
+func TestBuildConfig_MaxItemsFlag(t *testing.T) {
+	jsonContent := `{
+		"url": "https://example.com",
+		"maxItems": 25
+	}`
+	path := createTempJSON(t, jsonContent)
+
+	cmd := &CrawlCommand{
+		MaxItems:   100,
+		ConfigFile: path,
+	}
+
+	config, buildErr := buildPlaywrightFetcherConfig(cmd, newTestLogger())
+	if buildErr != nil {
+		t.Fatalf("expected no error but got %v", buildErr)
+	}
+
+	if config.MaxItems != 100 {
+		t.Errorf("CLI MaxItems should override JSON, expected 100 but got %d", config.MaxItems)
+	}
+}
+
+func TestBuildConfig_MaxItemsDefault(t *testing.T) {
+	cmd := &CrawlCommand{
+		ConfigFile: DefaultConfigPath,
+	}
+
+	config, buildErr := buildPlaywrightFetcherConfig(cmd, newTestLogger())
+	if buildErr != nil {
+		t.Fatalf("expected no error but got %v", buildErr)
+	}
+
+	if config.MaxItems != 0 {
+		t.Errorf("expected default MaxItems 0 (unlimited) but got %d", config.MaxItems)
+	}
+}
+
+func TestBuildConfig_PaginationMerge(t *testing.T) {
+	jsonContent := `{
+		"url": "https://example.com",
+		"pagination": {
+			"containerSelectors": [".custom-pagination"],
+			"strategy": "page-numbers"
+		}
+	}`
+	path := createTempJSON(t, jsonContent)
+
+	cmd := &CrawlCommand{
+		ConfigFile: path,
+	}
+
+	config, buildErr := buildPlaywrightFetcherConfig(cmd, newTestLogger())
+	if buildErr != nil {
+		t.Fatalf("expected no error but got %v", buildErr)
+	}
+
+	if len(config.Pagination.ContainerSelectors) != 1 || config.Pagination.ContainerSelectors[0] != ".custom-pagination" {
+		t.Errorf("expected ContainerSelectors from JSON but got %v", config.Pagination.ContainerSelectors)
+	}
+	if config.Pagination.Strategy != "page-numbers" {
+		t.Errorf("expected Strategy 'page-numbers' from JSON but got %s", config.Pagination.Strategy)
+	}
+
+	defaultConfig := playwrightfetcher.DefaultConfig()
+	if config.Pagination.MaxRetries != defaultConfig.Pagination.MaxRetries {
+		t.Error("MaxRetries from default config should be preserved when not overridden by JSON")
+	}
+}
