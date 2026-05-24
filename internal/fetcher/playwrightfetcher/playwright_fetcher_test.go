@@ -17,6 +17,8 @@ import (
 	"github.com/playwright-community/playwright-go"
 )
 
+const paginationSelectors = "[data-automation='pagination-next']"
+
 var runFetchTest = false
 
 func TestMain(m *testing.M) {
@@ -171,8 +173,8 @@ func Test_WaitAndCollectResults_AndfetchSPAConfigPageSelectors(t *testing.T) {
 		{
 			name: "should navigate pages",
 			pageSelectors: &PaginationConfig{
-				ContainerSelectors: []string{"[data-automation='pagination-next']"},
-				NextSelectors:      []string{"[data-automation='pagination-next']"},
+				ContainerSelectors: []string{paginationSelectors},
+				NextSelectors:      []string{paginationSelectors},
 				DisabledSelector:   "button[disabled]",
 				WaitForSelectors:   []string{"a[data-automation='jobTitle']"},
 				Strategy:           "auto",
@@ -185,34 +187,15 @@ func Test_WaitAndCollectResults_AndfetchSPAConfigPageSelectors(t *testing.T) {
 
 	for _, tt := range tc {
 		t.Run(tt.name, func(t *testing.T) {
-			htmlBytes, err := os.ReadFile("./testdata/pagination_html")
-			if err != nil {
-				t.Fatalf("failed to read HTML file: %v", err)
-			}
-
-			ts := createTestHttpServer(string(htmlBytes))
-
-			f := createMockFetcher()
+			f, p := setup_paginationTest(t)
 			f.fetchConfig.Pagination = *tt.pageSelectors
-
-			err = f.configurePlaywrightBrowser()
-			if err != nil {
-				t.Fatalf("configurePlaywrightBrowser() error: %v", err)
-			}
 			defer f.Close()
-
-			p, _ := f.browserCtx.NewPage()
 
 			mockFn := func(ctx context.Context, p playwright.Page) ([]crawler.FetchResult, error) {
 				return []crawler.FetchResult{}, nil
 			}
-			pOpts := playwright.PageGotoOptions{}
-			_, err = p.Goto(ts.URL, pOpts)
-			if err != nil {
-				t.Fatalf("page.Goto() error = %v", err)
-			}
 
-			_, err = collectPageResults(t.Context(), f, p, mockFn)
+			_, err := collectPageResults(t.Context(), f, p, mockFn)
 			if err != nil {
 				t.Fatalf("collected page results error: %v", err)
 			}
@@ -243,6 +226,16 @@ func Test_WaitAndCollectResults_AndfetchSPAConfigPageSelectors(t *testing.T) {
 			}
 		})
 	}
+}
+
+func createPaginationTestServer(t *testing.T) (*httptest.Server, error) {
+	htmlBytes, err := os.ReadFile("./testdata/pagination_html")
+	if err != nil {
+		t.Fatalf("failed to read HTML file: %v", err)
+	}
+
+	ts := createTestHttpServer(string(htmlBytes))
+	return ts, err
 }
 
 func Test_WaitAndCollectResults_AndfetchSPAConfigDataSelectors(t *testing.T) {
@@ -516,7 +509,114 @@ func Test_ShouldStopPagination(t *testing.T) {
 	}
 }
 
-// isNextDisabled
+func Test_HasPaginationSection(t *testing.T) {
+	tc := []struct {
+		name               string
+		containerSelectors []string
+		expected           bool
+	}{
+		{
+			name:               "returns false when no selectors configured",
+			containerSelectors: nil,
+			expected:           false,
+		},
+		{
+			name:               "returns false when selectors do not match",
+			containerSelectors: []string{".missing-pagination"},
+			expected:           false,
+		},
+		{
+			name:               "returns true when any selector matches",
+			containerSelectors: []string{".missing-pagination", paginationSelectors},
+			expected:           true,
+		},
+	}
+
+	for _, tt := range tc {
+		t.Run(tt.name, func(t *testing.T) {
+			f, p := setup_paginationTest(t)
+			defer f.Close()
+			defer func() {
+				if closeErr := p.Close(); closeErr != nil {
+					t.Logf("error closing page: %v", closeErr)
+				}
+			}()
+
+			f.fetchConfig.Pagination.ContainerSelectors = tt.containerSelectors
+
+			hasSelectors := f.hasPaginationSection(p)
+			if hasSelectors != tt.expected {
+				t.Fatalf("expected %t, got %t", tt.expected, hasSelectors)
+			}
+		})
+	}
+}
+
+func setup_paginationTest(t *testing.T) (*PlaywrightFetcher, playwright.Page) {
+	f := createMockFetcher()
+	f.fetchConfig.Pagination.ContainerSelectors = []string{paginationSelectors}
+	ts, err := createPaginationTestServer(t)
+	if err != nil {
+		t.Fatalf("failed to start test server: % v", err)
+	}
+
+	err = f.configurePlaywrightBrowser()
+	if err != nil {
+		t.Fatalf("configurePlaywrightBrowser() error: %v", err)
+	}
+	p, _ := f.browserCtx.NewPage()
+
+	pOpts := playwright.PageGotoOptions{}
+	_, err = p.Goto(ts.URL, pOpts)
+	if err != nil {
+		t.Fatalf("failed to navigate: %v", err)
+	}
+	return f, p
+}
+
+func Test_IsNextDisabled(t *testing.T) {
+	tc := []struct {
+		name             string
+		disabledSelector string
+		expected         bool
+	}{
+		{
+			name:             "returns false when disabled selector is empty",
+			disabledSelector: "",
+			expected:         false,
+		},
+		{
+			name:             "returns false when disabled selector does not match",
+			disabledSelector: "button[disabled]",
+			expected:         false,
+		},
+		{
+			name:             "returns true when disabled selector matches page",
+			disabledSelector: paginationSelectors,
+			expected:         true,
+		},
+	}
+
+	for _, tt := range tc {
+		t.Run(tt.name, func(t *testing.T) {
+			f, p := setup_paginationTest(t)
+			defer f.Close()
+			defer func() {
+				if closeErr := p.Close(); closeErr != nil {
+					t.Logf("error closing page: %v", closeErr)
+				}
+			}()
+
+			f.fetchConfig.Pagination.DisabledSelector = tt.disabledSelector
+
+			res := f.isNextDisabled(p)
+			if res != tt.expected {
+				t.Errorf("isNextDisabled() returned %v expected %v", res, tt.expected)
+			}
+		})
+	}
+}
+
 // clickNextPageWithRetry
 // waitForNextPageLoad
 // clickNextButton
