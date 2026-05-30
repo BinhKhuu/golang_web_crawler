@@ -668,7 +668,7 @@ func Test_ClickNextPageWithRetry(t *testing.T) {
 			f.fetchConfig.Pagination.Strategy = tt.strategy
 
 			var err error
-			for i := 0; i < tt.clicks; i++ {
+			for range tt.clicks {
 				err = f.clickNextPageWithRetry(t.Context(), p)
 				if err != nil {
 					break
@@ -714,66 +714,59 @@ func Test_ClickNextPageWithRetry(t *testing.T) {
 	}
 }
 
-// waitForNextPageLoad
-func Test_WaitForNextPageLoad_ReturnWithNoResults(t *testing.T) {
-	f, p := setup_paginationTest(t)
-	f.fetchConfig.Pagination.WaitForSelectors = []string{}
-	defer f.Close()
-	defer func() {
-		if closeErr := p.Close(); closeErr != nil {
-			t.Logf("error closing page: %v", closeErr)
-		}
-	}()
-	if err := f.waitForNextPageLoad(t.Context(), p); err != nil {
-		t.Errorf("expected no error but got %v", err)
+func Test_WaitForNextPageLoad(t *testing.T) {
+	tc := []struct {
+		name             string
+		waitForSelectors []string
+		ctx              func(t *testing.T) context.Context
+		expectErr        bool
+	}{
+		{
+			name:             "returns nil when no selectors configured",
+			waitForSelectors: []string{},
+			ctx:              func(t *testing.T) context.Context { return t.Context() },
+			expectErr:        false,
+		},
+		{
+			name:             "returns context error when context is expired",
+			waitForSelectors: []string{".next-button"},
+			ctx: func(t *testing.T) context.Context {
+				ctx, cancel := context.WithTimeout(context.Background(), 0)
+				defer cancel()
+				return ctx
+			},
+			expectErr: true,
+		},
+		{
+			name:             "returns nil when selectors match page content",
+			waitForSelectors: DefaultConfig().Pagination.WaitForSelectors,
+			ctx:              func(t *testing.T) context.Context { return t.Context() },
+			expectErr:        false,
+		},
+		{
+			name:             "returns error when no selectors match",
+			waitForSelectors: []string{".next-button"},
+			ctx:              func(t *testing.T) context.Context { return t.Context() },
+			expectErr:        true,
+		},
+	}
+
+	for _, tt := range tc {
+		t.Run(tt.name, func(t *testing.T) {
+			f, p := setup_paginationTest(t)
+			defer f.Close()
+			defer func() {
+				if closeErr := p.Close(); closeErr != nil {
+					t.Logf("error closing page: %v", closeErr)
+				}
+			}()
+
+			f.fetchConfig.Pagination.WaitForSelectors = tt.waitForSelectors
+
+			err := f.waitForNextPageLoad(tt.ctx(t), p)
+			if (err != nil) != tt.expectErr {
+				t.Errorf("expected error=%t, got err=%v", tt.expectErr, err)
+			}
+		})
 	}
 }
-
-func Test_WaitForNextPageLoad_CtxError(t *testing.T) {
-	ctx, _ := context.WithTimeout(context.Background(), 0)
-	f, p := setup_paginationTest(t)
-	f.fetchConfig.Pagination.WaitForSelectors = []string{".next-button"}
-	defer f.Close()
-	defer func() {
-		if closeErr := p.Close(); closeErr != nil {
-			t.Logf("error closing page: %v", closeErr)
-		}
-	}()
-	if err := f.waitForNextPageLoad(ctx, p); err == nil {
-		t.Errorf("expected error but got nil")
-	}
-}
-
-func Test_WaitForNextPageLoad_ReturnResults(t *testing.T) {
-	f, p := setup_paginationTest(t)
-	defer f.Close()
-	defer func() {
-		if closeErr := p.Close(); closeErr != nil {
-			t.Logf("error closing page: %v", closeErr)
-		}
-	}()
-	config := DefaultConfig()
-	f.fetchConfig = &config
-
-	if err := f.waitForNextPageLoad(t.Context(), p); err != nil {
-		t.Errorf("Expected No error but got %v", err)
-	}
-}
-
-func Test_WaitForNextPageLoad_NoMatchError(t *testing.T) {
-	f, p := setup_paginationTest(t)
-	defer f.Close()
-	defer func() {
-		if closeErr := p.Close(); closeErr != nil {
-			t.Logf("error closing page: %v", closeErr)
-		}
-	}()
-	f.fetchConfig.Pagination.WaitForSelectors = []string{".next-button"}
-	if err := f.waitForNextPageLoad(t.Context(), p); err == nil {
-		t.Errorf("Expected error but got nil")
-	}
-}
-
-// clickNextButton
-// clickNextPageNumber
-// waitForNextPageLoad
