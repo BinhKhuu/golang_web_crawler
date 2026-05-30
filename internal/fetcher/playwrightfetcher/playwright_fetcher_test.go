@@ -731,6 +731,12 @@ func Test_WaitForNextPageLoad(t *testing.T) {
 		expectErr        bool
 	}{
 		{
+			name:             "returns nil when wait selectors are nil",
+			waitForSelectors: nil,
+			ctx:              func(t *testing.T) context.Context { return t.Context() },
+			expectErr:        false,
+		},
+		{
 			name:             "returns nil when no selectors configured",
 			waitForSelectors: []string{},
 			ctx:              func(t *testing.T) context.Context { return t.Context() },
@@ -877,5 +883,3 @@ func Test_ClickNextPageNumber(t *testing.T) {
 		})
 	}
 }
-
-// waitForNextPageLoad
