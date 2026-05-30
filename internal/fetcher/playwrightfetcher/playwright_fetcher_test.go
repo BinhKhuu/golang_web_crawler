@@ -19,6 +19,8 @@ import (
 
 const paginationSelectors = "[data-automation='pagination-next']"
 
+const nonexistentSelector = "#nonexistent"
+
 var runFetchTest = false
 
 func TestMain(m *testing.M) {
@@ -791,12 +793,12 @@ func Test_ClickNextButton(t *testing.T) {
 		},
 		{
 			name:          "returns false when no selectors match",
-			nextSelectors: []string{"#nonexistent"},
+			nextSelectors: []string{nonexistentSelector},
 			expectedClick: false,
 		},
 		{
 			name:          "returns true when fallback selector matches",
-			nextSelectors: []string{"#nonexistent", paginationSelectors},
+			nextSelectors: []string{nonexistentSelector, paginationSelectors},
 			expectedClick: true,
 		},
 		{
@@ -826,5 +828,54 @@ func Test_ClickNextButton(t *testing.T) {
 	}
 }
 
-// clickNextPageNumber
+func Test_ClickNextPageNumber(t *testing.T) {
+	const pageNumberSelector = "[data-automation='pageNumber']"
+
+	tc := []struct {
+		name                string
+		pageNumberSelectors []string
+		expectedClick       bool
+	}{
+		{
+			name:                "returns true when first selector matches",
+			pageNumberSelectors: []string{pageNumberSelector},
+			expectedClick:       true,
+		},
+		{
+			name:                "returns false when no selectors match",
+			pageNumberSelectors: []string{nonexistentSelector},
+			expectedClick:       false,
+		},
+		{
+			name:                "returns true when fallback selector matches",
+			pageNumberSelectors: []string{nonexistentSelector, pageNumberSelector},
+			expectedClick:       true,
+		},
+		{
+			name:                "returns false when selectors slice is empty",
+			pageNumberSelectors: []string{},
+			expectedClick:       false,
+		},
+	}
+
+	for _, tt := range tc {
+		t.Run(tt.name, func(t *testing.T) {
+			f, p := setup_paginationTest(t)
+			defer f.Close()
+			defer func() {
+				if closeErr := p.Close(); closeErr != nil {
+					t.Logf("error closing page: %v", closeErr)
+				}
+			}()
+
+			f.fetchConfig.Pagination.PageNumberSelectors = tt.pageNumberSelectors
+
+			click := f.clickNextPageNumber(p)
+			if click != tt.expectedClick {
+				t.Errorf("clickNextPageNumber() returned %v, expected %v", click, tt.expectedClick)
+			}
+		})
+	}
+}
+
 // waitForNextPageLoad
