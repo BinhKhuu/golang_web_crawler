@@ -715,6 +715,65 @@ func Test_ClickNextPageWithRetry(t *testing.T) {
 }
 
 // waitForNextPageLoad
+func Test_WaitForNextPageLoad_ReturnWithNoResults(t *testing.T) {
+	f, p := setup_paginationTest(t)
+	f.fetchConfig.Pagination.WaitForSelectors = []string{}
+	defer f.Close()
+	defer func() {
+		if closeErr := p.Close(); closeErr != nil {
+			t.Logf("error closing page: %v", closeErr)
+		}
+	}()
+	if err := f.waitForNextPageLoad(t.Context(), p); err != nil {
+		t.Errorf("expected no error but got %v", err)
+	}
+}
+
+func Test_WaitForNextPageLoad_CtxError(t *testing.T) {
+	ctx, _ := context.WithTimeout(context.Background(), 0)
+	f, p := setup_paginationTest(t)
+	f.fetchConfig.Pagination.WaitForSelectors = []string{".next-button"}
+	defer f.Close()
+	defer func() {
+		if closeErr := p.Close(); closeErr != nil {
+			t.Logf("error closing page: %v", closeErr)
+		}
+	}()
+	if err := f.waitForNextPageLoad(ctx, p); err == nil {
+		t.Errorf("expected error but got nil")
+	}
+}
+
+func Test_WaitForNextPageLoad_ReturnResults(t *testing.T) {
+	f, p := setup_paginationTest(t)
+	defer f.Close()
+	defer func() {
+		if closeErr := p.Close(); closeErr != nil {
+			t.Logf("error closing page: %v", closeErr)
+		}
+	}()
+	config := DefaultConfig()
+	f.fetchConfig = &config
+
+	if err := f.waitForNextPageLoad(t.Context(), p); err != nil {
+		t.Errorf("Expected No error but got %v", err)
+	}
+}
+
+func Test_WaitForNextPageLoad_NoMatchError(t *testing.T) {
+	f, p := setup_paginationTest(t)
+	defer f.Close()
+	defer func() {
+		if closeErr := p.Close(); closeErr != nil {
+			t.Logf("error closing page: %v", closeErr)
+		}
+	}()
+	f.fetchConfig.Pagination.WaitForSelectors = []string{".next-button"}
+	if err := f.waitForNextPageLoad(t.Context(), p); err == nil {
+		t.Errorf("Expected error but got nil")
+	}
+}
+
 // clickNextButton
 // clickNextPageNumber
 // waitForNextPageLoad
