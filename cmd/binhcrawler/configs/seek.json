@@ -16,9 +16,9 @@
     "rootRelativePrefixes": ["job/"]
   },
   "pagination": {
-    "containerSelectors": ["[data-automation='pagination']"],
-    "nextSelectors": ["button[data-automation='pagination-next']"],
-    "disabledSelector": "button[disabled]",
+    "containerSelectors": ["nav[aria-label='Pagination of results']"],
+    "nextSelectors": ["a[rel='nofollow next']", "a[aria-label='Next']"],
+    "disabledSelector": "a[rel='nofollow next'][aria-hidden='true']",
     "waitForSelectors": ["a[data-automation='jobTitle']"],
     "strategy": "auto",
     "maxRetries": 2,

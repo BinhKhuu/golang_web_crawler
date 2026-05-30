@@ -75,6 +75,7 @@ func GetSeekConfiguration() PlaywrightFetcherConfig {
 			WaitForSelectors:   []string{seekJobTitleSelector},
 			Strategy:           paginationStrategyAuto,
 			MaxRetries:         defaultMaxRetries,
+			MaxPages:           2,
 		},
 	}
 }

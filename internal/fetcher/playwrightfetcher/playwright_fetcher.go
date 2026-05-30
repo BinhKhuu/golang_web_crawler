@@ -495,14 +495,17 @@ func (f *PlaywrightFetcher) shouldStopPagination(results []crawler.FetchResult) 
 
 func (f *PlaywrightFetcher) hasPaginationSection(p playwright.Page) bool {
 	if len(f.fetchConfig.Pagination.ContainerSelectors) == 0 {
+		f.logger.Debug("No container selectors configured, skipping pagination")
 		return false
 	}
 	for _, sel := range f.fetchConfig.Pagination.ContainerSelectors {
 		count, err := p.Locator(sel).Count()
+		f.logger.Debug("Checking container selector", "selector", sel, "count", count, "error", err)
 		if err == nil && count > 0 {
 			return true
 		}
 	}
+	f.logger.Warn("No pagination container found with configured selectors")
 	return false
 }
 
@@ -511,6 +514,7 @@ func (f *PlaywrightFetcher) isNextDisabled(p playwright.Page) bool {
 		return false
 	}
 	count, err := p.Locator(f.fetchConfig.Pagination.DisabledSelector).Count()
+	f.logger.Debug("Checking disabled selector", "selector", f.fetchConfig.Pagination.DisabledSelector, "count", count, "error", err)
 	return err == nil && count > 0
 }
 
