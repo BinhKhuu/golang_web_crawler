@@ -121,22 +121,6 @@ func configurePlaywright(f *PlaywrightFetcher, logger *slog.Logger) (*Playwright
 	return f, nil
 }
 
-func (f *PlaywrightFetcher) timeoutInMs() float64 {
-	if f.fetchConfig != nil && f.fetchConfig.Timeout > 0 {
-		return float64(f.fetchConfig.Timeout)
-	}
-	return float64(defaultTimeout)
-}
-
-// clickWithTimeout passes the timeout explicitly because relying on Playwright
-// defaults in these retry-heavy paths led to slow failures for missing or
-// invalid selectors.
-func (f *PlaywrightFetcher) clickWithTimeout(locator playwright.Locator) error {
-	return locator.Click(playwright.LocatorClickOptions{
-		Timeout: playwright.Float(f.timeoutInMs()),
-	})
-}
-
 func (f *PlaywrightFetcher) Fetch(ctx context.Context, url string) ([]crawler.FetchResult, error) {
 	return f.fetchFn(ctx, url)
 }
@@ -320,6 +304,22 @@ func (f *PlaywrightFetcher) Close() error {
 		}
 	}
 	return nil
+}
+
+func (f *PlaywrightFetcher) timeoutInMs() float64 {
+	if f.fetchConfig != nil && f.fetchConfig.Timeout > 0 {
+		return float64(f.fetchConfig.Timeout)
+	}
+	return float64(defaultTimeout)
+}
+
+// clickWithTimeout passes the timeout explicitly because relying on Playwright
+// defaults in these retry-heavy paths led to slow failures for missing or
+// invalid selectors.
+func (f *PlaywrightFetcher) clickWithTimeout(locator playwright.Locator) error {
+	return locator.Click(playwright.LocatorClickOptions{
+		Timeout: playwright.Float(f.timeoutInMs()),
+	})
 }
 
 // waitAndCollectResults stops on first matching selector.

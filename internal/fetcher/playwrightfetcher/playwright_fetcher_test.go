@@ -667,51 +667,58 @@ func Test_ClickNextPageWithRetry(t *testing.T) {
 			f.fetchConfig.Pagination.NextSelectors = tt.nextSelectors
 			f.fetchConfig.Pagination.Strategy = tt.strategy
 
-			var err error
-			for range tt.clicks {
-				err = f.clickNextPageWithRetry(t.Context(), p)
-				if err != nil {
-					break
-				}
-			}
+			err := executePaginationClicks(t.Context(), f, p, tt.clicks)
 
 			if (err != nil) != tt.expectedErr {
 				t.Fatalf("expected error=%t, got err=%v", tt.expectedErr, err)
 			}
 
-			if !tt.assertLastPageState {
-				return
-			}
-
-			if waitErr := p.Locator("span.disabled").First().WaitFor(playwright.LocatorWaitForOptions{
-				State:   playwright.WaitForSelectorStateVisible,
-				Timeout: playwright.Float(5000),
-			}); waitErr != nil {
-				t.Fatalf("waiting for last page state: %v", waitErr)
-			}
-
-			finalURL := p.URL()
-			if !strings.Contains(finalURL, "#page=3") {
-				t.Errorf("expected final URL to contain #page=3, got %s", finalURL)
-			}
-
-			pageInfo, _ := p.Locator(".page-info").TextContent()
-			if pageInfo != "Page 3 of 3" {
-				t.Errorf("expected page info 'Page 3 of 3', got %q", pageInfo)
-			}
-
-			jobTitles, _ := p.Locator("a[data-automation='jobTitle']").AllTextContents()
-			expectedJobs := []string{"Frontend Architect"}
-			if len(jobTitles) != len(expectedJobs) {
-				t.Errorf("expected %d jobs, got %d", len(expectedJobs), len(jobTitles))
-			}
-
-			nextDisabled, _ := p.Locator("span.disabled").Count()
-			if nextDisabled == 0 {
-				t.Error("expected disabled next button on last page")
+			if tt.assertLastPageState {
+				assertLastPageState(t, p)
 			}
 		})
 	}
+}
+
+func assertLastPageState(t *testing.T, p playwright.Page) {
+	t.Helper()
+
+	if waitErr := p.Locator("span.disabled").First().WaitFor(playwright.LocatorWaitForOptions{
+		State:   playwright.WaitForSelectorStateVisible,
+		Timeout: playwright.Float(5000),
+	}); waitErr != nil {
+		t.Fatalf("waiting for last page state: %v", waitErr)
+	}
+
+	finalURL := p.URL()
+	if !strings.Contains(finalURL, "#page=3") {
+		t.Errorf("expected final URL to contain #page=3, got %s", finalURL)
+	}
+
+	pageInfo, _ := p.Locator(".page-info").TextContent()
+	if pageInfo != "Page 3 of 3" {
+		t.Errorf("expected page info 'Page 3 of 3', got %q", pageInfo)
+	}
+
+	jobTitles, _ := p.Locator("a[data-automation='jobTitle']").AllTextContents()
+	expectedJobs := []string{"Frontend Architect"}
+	if len(jobTitles) != len(expectedJobs) {
+		t.Errorf("expected %d jobs, got %d", len(expectedJobs), len(jobTitles))
+	}
+
+	nextDisabled, _ := p.Locator("span.disabled").Count()
+	if nextDisabled == 0 {
+		t.Error("expected disabled next button on last page")
+	}
+}
+
+func executePaginationClicks(ctx context.Context, f *PlaywrightFetcher, p playwright.Page, maxClicks int) error {
+	for range maxClicks {
+		if err := f.clickNextPageWithRetry(ctx, p); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func Test_WaitForNextPageLoad(t *testing.T) {
