@@ -770,3 +770,54 @@ func Test_WaitForNextPageLoad(t *testing.T) {
 		})
 	}
 }
+
+func Test_ClickNextButton(t *testing.T) {
+	tc := []struct {
+		name          string
+		nextSelectors []string
+		expectedClick bool
+	}{
+		{
+			name:          "returns true when first selector matches",
+			nextSelectors: []string{paginationSelectors},
+			expectedClick: true,
+		},
+		{
+			name:          "returns false when no selectors match",
+			nextSelectors: []string{"#nonexistent"},
+			expectedClick: false,
+		},
+		{
+			name:          "returns true when fallback selector matches",
+			nextSelectors: []string{"#nonexistent", paginationSelectors},
+			expectedClick: true,
+		},
+		{
+			name:          "returns false when selectors slice is empty",
+			nextSelectors: []string{},
+			expectedClick: false,
+		},
+	}
+
+	for _, tt := range tc {
+		t.Run(tt.name, func(t *testing.T) {
+			f, p := setup_paginationTest(t)
+			defer f.Close()
+			defer func() {
+				if closeErr := p.Close(); closeErr != nil {
+					t.Logf("error closing page: %v", closeErr)
+				}
+			}()
+
+			f.fetchConfig.Pagination.NextSelectors = tt.nextSelectors
+
+			click := f.clickNextButton(p)
+			if click != tt.expectedClick {
+				t.Errorf("clickNextButton() returned %v, expected %v", click, tt.expectedClick)
+			}
+		})
+	}
+}
+
+// clickNextPageNumber
+// waitForNextPageLoad
