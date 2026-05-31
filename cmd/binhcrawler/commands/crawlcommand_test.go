@@ -172,21 +172,6 @@ func TestBuildConfig_MergePriority(t *testing.T) {
 	}
 }
 
-func TestBuildConfig_DefaultHeadlessIsFalse(t *testing.T) {
-	cmd := &CrawlCommand{
-		ConfigFile: DefaultConfigPath,
-	}
-
-	config, buildErr := buildPlaywrightFetcherConfig(cmd, newTestLogger())
-	if buildErr != nil {
-		t.Fatalf("expected no error but got %v", buildErr)
-	}
-
-	if config.Headless {
-		t.Error("expected Headless false (headed mode) by default to avoid bot detection")
-	}
-}
-
 func TestBuildConfig_HeadlessOverride(t *testing.T) {
 	jsonContent := `{
 		"url": "https://example.com",

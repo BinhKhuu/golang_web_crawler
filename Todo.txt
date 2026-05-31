@@ -1,5 +1,4 @@
 todo: 
-    1. Playwright fetcher allow navigating multiple pages
     1. Playwright fetcher  
         - Investigate how to return network data 
         - add notes on play wright bot detection as readme
