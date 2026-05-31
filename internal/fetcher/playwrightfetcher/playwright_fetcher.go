@@ -627,15 +627,19 @@ func (f *PlaywrightFetcher) waitForNextPageLoad(ctx context.Context, p playwrigh
 }
 
 // configurePlaywrightBrowser sets up a Playwright browser instance with enhanced stealth options to better mimic human behavior and avoid detection by anti-bot measures.
-// will launch a browser in headed mode to prevent bot detection.
 func (f *PlaywrightFetcher) configurePlaywrightBrowser() error {
 	pw, err := playwright.Run()
 	if err != nil {
 		return err
 	}
 
+	headless := true
+	if f.fetchConfig != nil {
+		headless = f.fetchConfig.Headless
+	}
+
 	b, err := pw.Chromium.Launch(playwright.BrowserTypeLaunchOptions{
-		Headless: playwright.Bool(false),
+		Headless: playwright.Bool(headless),
 		Args: []string{
 			"--disable-blink-features=AutomationControlled",
 			"--disable-features=IsolateOrigins,site-per-process",
@@ -714,7 +718,7 @@ func (f *PlaywrightFetcher) configurePlaywrightBrowser() error {
 func DefaultConfig() PlaywrightFetcherConfig {
 	return PlaywrightFetcherConfig{
 		URL:      "https://www.seek.com.au",
-		Headless: false,
+		Headless: true,
 		Timeout:  defaultTimeout,
 		Search: SearchConfig{
 			InputSelectors: []string{

@@ -19,6 +19,15 @@ For CI pipelines, add the installation step before running tests:
   run: go run github.com/playwright-community/playwright-go/cmd/playwright install --with-deps chromium
 ```
 
+## Headless Mode
+
+The default configuration uses `Headless: true` for CI compatibility. However, some websites employ bot detection that may block or fail headless browsers. If tests against live sites fail:
+
+1. Set `Headless: true` → `Headless: false` in the config
+2. Run tests locally with a visible browser window
+
+Tests using `httptest.Server` (local HTML fixtures) always work in headless mode. Only tests hitting real websites may require headed mode due to bot detection.
+
 ## WaitUntilState Options
 
 `WaitUntilState` controls when `page.Goto()` resolves. The Go Playwright binding (`github.com/playwright-community/playwright-go`) exposes four constants:
@@ -39,7 +48,7 @@ For CI pipelines, add the installation step before running tests:
 | Field | Type | Description |
 |---|---|---|
 | `URL` | `string` | Base URL to crawl |
-| `Headless` | `bool` | Run browser in headless mode |
+| `Headless` | `bool` | Run browser in headless mode (default: `true`). Set to `false` for sites with aggressive bot detection. |
 | `Timeout` | `int` | Timeout in ms for navigation, waits, clicks (default: 10000) |
 | `MaxItems` | `int` | Max items to scrape (0 = unlimited) |
 | `Search` | `SearchConfig` | Search interaction settings |

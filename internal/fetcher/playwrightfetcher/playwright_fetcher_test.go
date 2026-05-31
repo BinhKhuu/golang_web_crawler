@@ -31,6 +31,8 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
+// Test_FetchSPAConfig tests the full SPA crawl flow against a live website.
+// NOTE: If the target site has bot detection, set config.Headless = false to use a headed browser.
 func Test_FetchSPAConfig(t *testing.T) {
 	if !runFetchTest {
 		t.Skip("Skipping: set RUN_FETCH_TESTS=1 to run")
@@ -62,6 +64,8 @@ func Test_FetchSPAConfig(t *testing.T) {
 	}
 }
 
+// Test_FetchDefault tests static page scraping against a live website.
+// NOTE: If the target site has bot detection, set config.Headless = false to use a headed browser.
 func Test_FetchDefault(t *testing.T) {
 	if !runFetchTest {
 		t.Skip("Skipping: set RUN_FETCH_TESTS=1 to run")
