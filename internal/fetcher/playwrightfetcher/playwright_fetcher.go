@@ -22,6 +22,13 @@ var (
 
 const defaultTimeout = 10000
 
+const (
+	paginationStrategyAuto    = "auto"
+	paginationStrategyNext    = "next-button"
+	paginationStrategyNumbers = "page-numbers"
+	defaultMaxRetries         = 2
+)
+
 type PlaywrightFetcher struct {
 	logger      *slog.Logger
 	fetchConfig *PlaywrightFetcherConfig
@@ -55,14 +62,36 @@ type CanonicalizationConfig struct {
 	RootRelativePrefixes []string `json:"rootRelativePrefixes"`
 }
 
+// PaginationConfig controls how the fetcher navigates through paginated results.
+type PaginationConfig struct {
+	// ContainerSelectors: selectors that indicate a pagination section exists.
+	ContainerSelectors []string `json:"containerSelectors"`
+	// NextSelectors: selectors for "next page" button (tried in order).
+	NextSelectors []string `json:"nextSelectors"`
+	// PageNumberSelectors: selectors for numbered page buttons.
+	PageNumberSelectors []string `json:"pageNumberSelectors"`
+	// DisabledSelector: attribute/selector indicating "next" is disabled.
+	DisabledSelector string `json:"disabledSelector"`
+	// WaitForSelectors: after clicking next, wait for these to appear.
+	WaitForSelectors []string `json:"waitForSelectors"`
+	// Strategy: "auto" (default) | "next-button" | "page-numbers".
+	Strategy string `json:"strategy"`
+	// MaxRetries: retries on next-page click failure (default: 2).
+	MaxRetries int `json:"maxRetries"`
+	MaxPages   int `json:"maxPages"`
+}
+
 type PlaywrightFetcherConfig struct {
 	URL      string `json:"url"`
 	Headless bool   `json:"headless"`
 	Timeout  int    `json:"timeout"`
+	// MaxItems limits the number of scraped results (0 = unlimited).
+	MaxItems int `json:"maxItems"`
 
 	Search           SearchConfig           `json:"search"`
 	Results          ResultsConfig          `json:"results"`
 	Canonicalization CanonicalizationConfig `json:"canonicalization"`
+	Pagination       PaginationConfig       `json:"pagination"`
 }
 
 func NewPlaywrightFetcher(logger *slog.Logger, fetchConfig *PlaywrightFetcherConfig) (*PlaywrightFetcher, error) {
@@ -112,13 +141,13 @@ func (f *PlaywrightFetcher) FetchDefault(ctx context.Context, url string) ([]cra
 		}
 	}()
 
-	const timeoutInMs = 30000
 	if ctxErr := ctx.Err(); ctxErr != nil {
 		return []crawler.FetchResult{}, ctxErr
 	}
+	// todo design a more consistent wait, can't use network idle because the app could be finished loading but there is ongoing network traffic
 	_, err = p.Goto(url, playwright.PageGotoOptions{
-		WaitUntil: playwright.WaitUntilStateNetworkidle,
-		Timeout:   playwright.Float(timeoutInMs),
+		WaitUntil: playwright.WaitUntilStateDomcontentloaded,
+		Timeout:   new(f.timeoutInMs()),
 	})
 	if err != nil {
 		return []crawler.FetchResult{}, err
@@ -170,12 +199,11 @@ func (f *PlaywrightFetcher) FetchSPAConfig(ctx context.Context, url string) ([]c
 		return []crawler.FetchResult{}, errors.New("fetch config is nil")
 	}
 
-	const timeoutInMs = 30000
 	if ctxErr := ctx.Err(); ctxErr != nil {
 		return []crawler.FetchResult{}, ctxErr
 	}
 	_, err = p.Goto(url, playwright.PageGotoOptions{
-		Timeout: playwright.Float(timeoutInMs),
+		Timeout: new(f.timeoutInMs()),
 	})
 	if err != nil {
 		return []crawler.FetchResult{}, err
@@ -187,16 +215,65 @@ func (f *PlaywrightFetcher) FetchSPAConfig(ctx context.Context, url string) ([]c
 	if searchErr := f.submitSearch(ctx, p); searchErr != nil {
 		return []crawler.FetchResult{}, searchErr
 	}
-	results, err := f.waitAndCollectResults(ctx, p)
+
+	res, err := collectPageResults(ctx, f, p, f.waitAndCollectResults)
 	if err != nil {
-		return results, err
+		f.logger.Error("Page collection error")
+		return nil, err
 	}
-	return results, nil
+	return res, nil
+}
+
+func collectPageResults(ctx context.Context, f *PlaywrightFetcher, p playwright.Page, collectionFn func(ctx context.Context, p playwright.Page) ([]crawler.FetchResult, error)) ([]crawler.FetchResult, error) {
+	var allResults []crawler.FetchResult
+	for page := 1; page <= f.fetchConfig.Pagination.MaxPages; page++ {
+		f.logger.Debug("Collecting page", "page", page)
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return allResults, ctxErr
+		}
+
+		pageResults, err := collectionFn(ctx, p)
+		if err != nil {
+			f.logger.Warn("error collecting results from page", "error", err)
+		}
+		allResults = append(allResults, pageResults...)
+
+		if f.shouldStopPagination(allResults) {
+			if f.fetchConfig.MaxItems > 0 && len(allResults) > f.fetchConfig.MaxItems {
+				allResults = allResults[:f.fetchConfig.MaxItems]
+			}
+			break
+		}
+
+		if !f.hasPaginationSection(p) {
+			break
+		}
+
+		if f.isNextDisabled(p) {
+			break
+		}
+
+		if clickErr := f.clickNextPageWithRetry(ctx, p); clickErr != nil {
+			f.logger.Warn("failed to navigate to next page after retries", "error", clickErr)
+			break
+		}
+
+		if waitErr := f.waitForNextPageLoad(ctx, p); waitErr != nil {
+			f.logger.Warn("timeout waiting for next page content", "error", waitErr)
+			break
+		}
+
+		if delayErr := randomDelay(ctx); delayErr != nil {
+			return allResults, delayErr
+		}
+	}
+
+	return allResults, nil
 }
 
 func randomDelay(ctx context.Context) error {
-	const randValue = 1000
-	const randRange = 2000
+	const randValue = 500
+	const randRange = 1000
 	// #nosec G404 - math/rand is sufficient for network jitter
 	delay := time.Duration(randValue+rand.Intn(randRange)) * time.Millisecond
 	timer := time.NewTimer(delay)
@@ -228,6 +305,22 @@ func (f *PlaywrightFetcher) Close() error {
 		}
 	}
 	return nil
+}
+
+func (f *PlaywrightFetcher) timeoutInMs() float64 {
+	if f.fetchConfig != nil && f.fetchConfig.Timeout > 0 {
+		return float64(f.fetchConfig.Timeout)
+	}
+	return float64(defaultTimeout)
+}
+
+// clickWithTimeout passes the timeout explicitly because relying on Playwright
+// defaults in these retry-heavy paths led to slow failures for missing or
+// invalid selectors.
+func (f *PlaywrightFetcher) clickWithTimeout(locator playwright.Locator) error {
+	return locator.Click(playwright.LocatorClickOptions{
+		Timeout: new(f.timeoutInMs()),
+	})
 }
 
 // waitAndCollectResults stops on first matching selector.
@@ -263,18 +356,17 @@ func (f *PlaywrightFetcher) waitAndCollectResults(ctx context.Context, p playwri
 }
 
 func waitForElementVisibility(f *PlaywrightFetcher, p playwright.Page, sel string) error {
-	timeout := float64(f.fetchConfig.Timeout)
 	locator := p.Locator(sel)
 	err := locator.First().WaitFor(playwright.LocatorWaitForOptions{
 		State:   playwright.WaitForSelectorStateVisible,
-		Timeout: playwright.Float(timeout),
+		Timeout: new(f.timeoutInMs()),
 	})
 	return err
 }
 
 func (f *PlaywrightFetcher) fetchSPAConfigClickAction(ctx context.Context, entry playwright.Locator, p playwright.Page) ([]crawler.FetchResult, error) {
 	id := f.createFetchID(entry, p)
-	err := entry.Click()
+	err := f.clickWithTimeout(entry)
 	if err != nil {
 		f.logger.Error("error clicking entry", "error", err)
 		return nil, err
@@ -395,16 +487,159 @@ func (f *PlaywrightFetcher) fetchSPAConfigDataSelectors(ctx context.Context, p p
 	return results, nil
 }
 
+func (f *PlaywrightFetcher) shouldStopPagination(results []crawler.FetchResult) bool {
+	if f.fetchConfig.MaxItems <= 0 {
+		return false
+	}
+	return len(results) >= f.fetchConfig.MaxItems
+}
+
+func (f *PlaywrightFetcher) hasPaginationSection(p playwright.Page) bool {
+	if len(f.fetchConfig.Pagination.ContainerSelectors) == 0 {
+		f.logger.Debug("No container selectors configured, skipping pagination")
+		return false
+	}
+	for _, sel := range f.fetchConfig.Pagination.ContainerSelectors {
+		count, err := p.Locator(sel).Count()
+		f.logger.Debug("Checking container selector", "selector", sel, "count", count, "error", err)
+		if err == nil && count > 0 {
+			return true
+		}
+	}
+	f.logger.Warn("No pagination container found with configured selectors")
+	return false
+}
+
+func (f *PlaywrightFetcher) isNextDisabled(p playwright.Page) bool {
+	if f.fetchConfig.Pagination.DisabledSelector == "" {
+		return false
+	}
+	count, err := p.Locator(f.fetchConfig.Pagination.DisabledSelector).Count()
+	f.logger.Debug("Checking disabled selector", "selector", f.fetchConfig.Pagination.DisabledSelector, "count", count, "error", err)
+	return err == nil && count > 0
+}
+
+func (f *PlaywrightFetcher) clickNextPageWithRetry(ctx context.Context, p playwright.Page) error {
+	maxRetries := f.fetchConfig.Pagination.MaxRetries
+	if maxRetries <= 0 {
+		maxRetries = defaultMaxRetries
+	}
+
+	strategy := f.fetchConfig.Pagination.Strategy
+	if strategy == "" {
+		strategy = paginationStrategyAuto
+	}
+
+	var lastErr error
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return ctxErr
+		}
+
+		if attempt > 0 {
+			if delayErr := randomDelay(ctx); delayErr != nil {
+				return delayErr
+			}
+		}
+
+		var clicked bool
+		switch strategy {
+		case paginationStrategyNext:
+			clicked = f.clickNextButton(p)
+		case paginationStrategyNumbers:
+			clicked = f.clickNextPageNumber(p)
+		default:
+			clicked = f.clickNextButton(p)
+			if !clicked {
+				clicked = f.clickNextPageNumber(p)
+			}
+		}
+
+		if clicked {
+			return nil
+		}
+
+		lastErr = errors.New("no pagination control found to click")
+	}
+
+	return fmt.Errorf("click next page after %d retries: %w", maxRetries, lastErr)
+}
+
+func (f *PlaywrightFetcher) clickNextButton(p playwright.Page) bool {
+	for _, sel := range f.fetchConfig.Pagination.NextSelectors {
+		locator := p.Locator(sel)
+		count, err := locator.Count()
+		if err != nil || count == 0 {
+			continue
+		}
+		err = f.clickWithTimeout(locator.First())
+		if err == nil {
+			return true
+		}
+	}
+	return false
+}
+
+func (f *PlaywrightFetcher) clickNextPageNumber(p playwright.Page) bool {
+	for _, sel := range f.fetchConfig.Pagination.PageNumberSelectors {
+		entries, err := p.Locator(sel).All()
+		if err != nil || len(entries) == 0 {
+			continue
+		}
+		for _, entry := range entries {
+			text, textErr := entry.TextContent()
+			if textErr != nil {
+				continue
+			}
+			if strings.TrimSpace(text) == "" {
+				continue
+			}
+			err := f.clickWithTimeout(entry)
+			if err == nil {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (f *PlaywrightFetcher) waitForNextPageLoad(ctx context.Context, p playwright.Page) error {
+	if len(f.fetchConfig.Pagination.WaitForSelectors) == 0 {
+		return nil
+	}
+
+	for _, sel := range f.fetchConfig.Pagination.WaitForSelectors {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return ctxErr
+		}
+
+		locator := p.Locator(sel)
+		err := locator.First().WaitFor(playwright.LocatorWaitForOptions{
+			State:   playwright.WaitForSelectorStateVisible,
+			Timeout: new(f.timeoutInMs()),
+		})
+		if err == nil {
+			return nil
+		}
+	}
+
+	return errors.New("no wait-for selectors matched on next page")
+}
+
 // configurePlaywrightBrowser sets up a Playwright browser instance with enhanced stealth options to better mimic human behavior and avoid detection by anti-bot measures.
-// will launch a browser in headed mode to prevent bot detection.
 func (f *PlaywrightFetcher) configurePlaywrightBrowser() error {
 	pw, err := playwright.Run()
 	if err != nil {
 		return err
 	}
 
+	headless := true
+	if f.fetchConfig != nil {
+		headless = f.fetchConfig.Headless
+	}
+
 	b, err := pw.Chromium.Launch(playwright.BrowserTypeLaunchOptions{
-		Headless: playwright.Bool(false),
+		Headless: new(headless),
 		Args: []string{
 			"--disable-blink-features=AutomationControlled",
 			"--disable-features=IsolateOrigins,site-per-process",
@@ -424,14 +659,14 @@ func (f *PlaywrightFetcher) configurePlaywrightBrowser() error {
 	const width = 1920
 	const height = 1080
 	ops := playwright.BrowserNewContextOptions{
-		UserAgent:         playwright.String("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"),
+		UserAgent:         new("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"),
 		Viewport:          &playwright.Size{Width: width, Height: height}, // Use ViewportSize pointer
-		Locale:            playwright.String("en-US"),
-		TimezoneId:        playwright.String("America/New_York"),
+		Locale:            new("en-US"),
+		TimezoneId:        new("America/New_York"),
 		Permissions:       []string{"geolocation", "notifications"}, // Add notifications to look more "human"
-		JavaScriptEnabled: playwright.Bool(true),
-		IgnoreHttpsErrors: playwright.Bool(true),
-		HasTouch:          playwright.Bool(false),
+		JavaScriptEnabled: new(true),
+		IgnoreHttpsErrors: new(true),
+		HasTouch:          new(false),
 	}
 
 	// 2. More comprehensive script injection
@@ -440,10 +675,12 @@ func (f *PlaywrightFetcher) configurePlaywrightBrowser() error {
 		b.Close()
 		return err
 	}
+	bctx.SetDefaultTimeout(f.timeoutInMs())
+	bctx.SetDefaultNavigationTimeout(f.timeoutInMs())
 
 	// 3. Enhanced stealth scripts
 	err = bctx.AddInitScript(playwright.Script{
-		Content: playwright.String(`
+		Content: new(`
             // Remove webdriver property
             Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
             
@@ -481,7 +718,7 @@ func (f *PlaywrightFetcher) configurePlaywrightBrowser() error {
 func DefaultConfig() PlaywrightFetcherConfig {
 	return PlaywrightFetcherConfig{
 		URL:      "https://www.seek.com.au",
-		Headless: false,
+		Headless: true,
 		Timeout:  defaultTimeout,
 		Search: SearchConfig{
 			InputSelectors: []string{
@@ -510,6 +747,14 @@ func DefaultConfig() PlaywrightFetcherConfig {
 		Canonicalization: CanonicalizationConfig{
 			IgnoreQueryParams:    []string{seekTrackingParamSol, seekTrackingParamRef, seekTrackingParamOrigin},
 			RootRelativePrefixes: []string{seekJobPathPrefix},
+		},
+		Pagination: PaginationConfig{
+			ContainerSelectors: []string{seekPaginationContainer},
+			NextSelectors:      []string{seekPaginationNext},
+			DisabledSelector:   seekPaginationDisabled,
+			WaitForSelectors:   []string{seekJobTitleSelector},
+			Strategy:           paginationStrategyAuto,
+			MaxRetries:         defaultMaxRetries,
 		},
 	}
 }

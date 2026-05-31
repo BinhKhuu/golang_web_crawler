@@ -29,13 +29,16 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Go 1.25.5
+      - name: Set up Go 1.26.3
         uses: actions/setup-go@v5
         with:
-          go-version: 1.25.5
+          go-version: 1.26.3
 
       - name: Force Go to use local toolchain for code coverage testing
         run: go env -w GOTOOLCHAIN=local
+
+      - name: Install Playwright Chromium
+        run: go run github.com/playwright-community/playwright-go/cmd/playwright install --with-deps chromium
 
       - name: Install golang-migrate
         run: |

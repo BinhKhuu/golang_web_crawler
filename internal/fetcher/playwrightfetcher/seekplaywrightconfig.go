@@ -10,6 +10,12 @@ const (
 	seekSubmitButton           = "button[type='submit']"
 	seekAutomationSearchButton = "button[data-automation='searchButton']"
 
+	// Seek pagination.
+	seekPaginationContainer = "[data-automation='pagination']"
+	seekPaginationNext      = "button[data-automation='pagination-next']"
+	seekPaginationDisabled  = "button[disabled]"
+	seePaginationMaxPages   = 2
+
 	// Seek canonicalization.
 	seekTrackingParamSol    = "sol"
 	seekTrackingParamRef    = "ref"
@@ -24,7 +30,7 @@ func GetSeekConfiguration() PlaywrightFetcherConfig {
 	return PlaywrightFetcherConfig{
 		// Target
 		URL:      seekSoftwareEngineerJobsURL,
-		Headless: false,
+		Headless: true,
 		Timeout:  defaultTimeout,
 
 		// Search interaction: fill input, submit, then wait for results
@@ -60,6 +66,17 @@ func GetSeekConfiguration() PlaywrightFetcherConfig {
 		Canonicalization: CanonicalizationConfig{
 			IgnoreQueryParams:    []string{seekTrackingParamSol, seekTrackingParamRef, seekTrackingParamOrigin},
 			RootRelativePrefixes: []string{seekJobPathPrefix},
+		},
+
+		// Pagination: navigate through search result pages
+		Pagination: PaginationConfig{
+			ContainerSelectors: []string{seekPaginationContainer},
+			NextSelectors:      []string{seekPaginationNext},
+			DisabledSelector:   seekPaginationDisabled,
+			WaitForSelectors:   []string{seekJobTitleSelector},
+			Strategy:           paginationStrategyAuto,
+			MaxRetries:         defaultMaxRetries,
+			MaxPages:           seePaginationMaxPages,
 		},
 	}
 }

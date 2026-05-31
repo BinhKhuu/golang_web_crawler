@@ -39,3 +39,13 @@
 - Plans should be concise even with at the expense of accuracy
 - when in plan mode create a plan file in `plans/` before starting and prompt me for a review
 - when testing database use sqlmock
+
+## Architecture Patterns
+
+### Job Construction (Config Struct + Factory Function)
+New job types follow the same pattern as `ParseJob`:
+- Define a `XxxConfig` struct bundling all dependencies (storage, parser, logger, etc.)
+- Expose a `NewXxxJob(cfg *XxxConfig) *XxxJob` factory function
+- The factory captures `cfg` in an `ExecuteFn` closure
+
+Avoid adding positional constructor arguments; put new dependencies in the config struct.

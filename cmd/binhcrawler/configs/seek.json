@@ -1,7 +1,7 @@
 {
   "url": "https://www.seek.com.au/software-engineer-jobs",
   "headless": false,
-  "timeout": 10000,
+  "timeout": 30000,
   "search": {
     "inputSelectors": ["input[name=keywords]", "input[placeholder*='Search']"],
     "query": "Software Engineer Jobs",
@@ -14,5 +14,15 @@
   "canonicalization": {
     "ignoreQueryParams": ["sol", "ref", "origin"],
     "rootRelativePrefixes": ["job/"]
-  }
+  },
+  "pagination": {
+    "containerSelectors": ["nav[aria-label='Pagination of results']"],
+    "nextSelectors": ["a[rel='nofollow next']", "a[aria-label='Next']"],
+    "disabledSelector": "a[rel='nofollow next'][aria-hidden='true']",
+    "waitForSelectors": ["a[data-automation='jobTitle']"],
+    "strategy": "auto",
+    "maxRetries": 2,
+    "maxPages": 2
+  },
+  "maxItems": 0
 }

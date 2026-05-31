@@ -65,26 +65,18 @@ var testJobListing = JobListing{
 	Company:         exampleInc,
 	RemoteFlag:      true,
 	Location:        remoteLocation,
-	SalaryMin:       floatPtr(750000.50),
-	SalaryMax:       floatPtr(150000),
+	SalaryMin:       new(750000.50),
+	SalaryMax:       new(float64(150000)),
 	Currency:        "USD",
 	DescriptionHTML: "<p>Job description</p>",
 	DescriptionText: "Job description",
-	PostedDate:      timePtr(typeutil.UTCTimeNow()),
-	ExpiresAt:       timePtr(typeutil.UTCTimeNow().Add(30 * 24 * time.Hour)),
+	PostedDate:      new(typeutil.UTCTimeNow()),
+	ExpiresAt:       new(typeutil.UTCTimeNow().Add(30 * 24 * time.Hour)),
 	Source:          "ExampleSource",
 	SourceID:        "12345",
 	URL:             "http://example.com/job/12345",
 	Tags:            []string{goSkill, remoteLocation},
 	RawJSON:         []byte(`{"title": "Software Engineer"}`),
-}
-
-func floatPtr(f float64) *float64 {
-	return &f
-}
-
-func timePtr(t time.Time) *time.Time {
-	return &t
 }
 
 func Test_StoreRawData_Success(t *testing.T) {
@@ -753,8 +745,8 @@ func Test_StoreJobListingData_FullFields(t *testing.T) {
 		Company:         "Big Tech Corp",
 		Location:        "San Francisco, CA",
 		RemoteFlag:      true,
-		SalaryMin:       floatPtr(150000),
-		SalaryMax:       floatPtr(250000),
+		SalaryMin:       new(float64(150000)),
+		SalaryMax:       new(float64(250000)),
 		Currency:        "USD",
 		DescriptionHTML: "<p>Exciting job description</p>",
 		DescriptionText: "Exciting job description",
