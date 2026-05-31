@@ -14,6 +14,7 @@ const (
 	seekPaginationContainer = "[data-automation='pagination']"
 	seekPaginationNext      = "button[data-automation='pagination-next']"
 	seekPaginationDisabled  = "button[disabled]"
+	seePaginationMaxPages   = 2
 
 	// Seek canonicalization.
 	seekTrackingParamSol    = "sol"
@@ -75,7 +76,7 @@ func GetSeekConfiguration() PlaywrightFetcherConfig {
 			WaitForSelectors:   []string{seekJobTitleSelector},
 			Strategy:           paginationStrategyAuto,
 			MaxRetries:         defaultMaxRetries,
-			MaxPages:           2,
+			MaxPages:           seePaginationMaxPages,
 		},
 	}
 }

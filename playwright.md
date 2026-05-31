@@ -2,6 +2,23 @@
 
 This document describes all configurable options for the `PlaywrightFetcher` and how they affect page loading, navigation, and data extraction.
 
+## Browser Installation
+
+Install the Playwright browser drivers (Chromium) with system dependencies:
+
+```bash
+go run github.com/playwright-community/playwright-go/cmd/playwright install --with-deps chromium
+```
+
+**Any test that creates a `PlaywrightFetcher` or calls `configurePlaywrightBrowser()` requires the browser to be installed**, even if it uses a local `httptest.Server` instead of real websites. Tests that only test pure logic (e.g., `Test_CanonicalizeFetchedURL`, `Test_ShouldStopPagination`) do not need the browser.
+
+For CI pipelines, add the installation step before running tests:
+
+```yaml
+- name: Install Playwright Chromium
+  run: go run github.com/playwright-community/playwright-go/cmd/playwright install --with-deps chromium
+```
+
 ## WaitUntilState Options
 
 `WaitUntilState` controls when `page.Goto()` resolves. The Go Playwright binding (`github.com/playwright-community/playwright-go`) exposes four constants:
