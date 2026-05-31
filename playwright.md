@@ -28,6 +28,8 @@ The default configuration uses `Headless: true` for CI compatibility. However, s
 
 Tests using `httptest.Server` (local HTML fixtures) always work in headless mode. Only tests hitting real websites may require headed mode due to bot detection.
 
+default seekconfiguraiton found in `/configs/seek.json`
+
 ## WaitUntilState Options
 
 `WaitUntilState` controls when `page.Goto()` resolves. The Go Playwright binding (`github.com/playwright-community/playwright-go`) exposes four constants:
