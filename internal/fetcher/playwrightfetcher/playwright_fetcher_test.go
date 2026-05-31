@@ -69,7 +69,7 @@ func Test_FetchDefault(t *testing.T) {
 	url := seekSoftwareEngineerJobsURL
 	ctx := context.Background()
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slog.LevelDebug,
+		Level: slog.LevelError,
 	}))
 	config := DefaultConfig()
 	fetcher, err := NewPlaywrightFetcher(logger, &config)

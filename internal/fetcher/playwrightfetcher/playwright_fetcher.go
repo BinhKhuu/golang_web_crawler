@@ -144,8 +144,9 @@ func (f *PlaywrightFetcher) FetchDefault(ctx context.Context, url string) ([]cra
 	if ctxErr := ctx.Err(); ctxErr != nil {
 		return []crawler.FetchResult{}, ctxErr
 	}
+	// todo design a more consistant wait, can't use network idle because the app could be finished loading but there is ongoing network traffic
 	_, err = p.Goto(url, playwright.PageGotoOptions{
-		WaitUntil: playwright.WaitUntilStateNetworkidle,
+		WaitUntil: playwright.WaitUntilStateDomcontentloaded,
 		Timeout:   playwright.Float(f.timeoutInMs()),
 	})
 	if err != nil {
