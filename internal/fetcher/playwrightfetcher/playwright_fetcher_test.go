@@ -165,7 +165,7 @@ func createMockFetcher() *PlaywrightFetcher {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	f := &PlaywrightFetcher{
 		logger:      logger,
-		fetchConfig: &PlaywrightFetcherConfig{},
+		fetchConfig: &PlaywrightFetcherConfig{Headless: true}, // Ensure headless mode for CI compatibility
 	}
 	return f
 }
