@@ -2,7 +2,7 @@ package job
 
 import (
 	"context"
-	"database/sql"
+	"errors"
 	"fmt"
 	"golangwebcrawler/internal/models"
 	"golangwebcrawler/internal/storage"
@@ -108,7 +108,7 @@ type ParserJob interface {
 // ParseConfig holds configuration for a parse job.
 type ParseConfig struct {
 	Storage   StorageJob
-	ParserFn  func() (ParserJob, error)
+	Parser    ParserJob
 	Logger    *slog.Logger
 	StartDate time.Time
 	BatchSize int
@@ -125,15 +125,15 @@ func executeParse(ctx context.Context, cfg *ParseConfig) error {
 		return nil
 	}
 
+	p := cfg.Parser
+	if p == nil {
+		return errors.New("parser not set in ParseConfig")
+	}
+
 	// Collect URLs for deletion after parsing completes.
 	urls := make([]string, len(rawData))
 	for i, item := range rawData {
 		urls[i] = item.URL
-	}
-
-	p, err := cfg.ParserFn()
-	if err != nil {
-		return fmt.Errorf("failed to create parser: %w", err)
 	}
 
 	batchSize := cfg.BatchSize
@@ -187,29 +187,24 @@ func executeParse(ctx context.Context, cfg *ParseConfig) error {
 	return nil
 }
 
-// NewDBParserCreator returns a function that creates a parser from the database.
-func NewDBParserCreator(db *sql.DB) func() (ParserJob, error) {
-	return func() (ParserJob, error) {
-		return &DBParser{db: db}, nil
-	}
-}
-
 // DBParser wraps the generic parser for job listings.
-type DBParser struct {
-	db *sql.DB
-}
+type DBParser struct{}
+
+var errParserNotInitialized = errors.New("parser not initialized: call SetParseJobListing before executing parse jobs")
 
 // ParseLLM delegates to the underlying parser implementation.
 func (p *DBParser) ParseLLM(ctx context.Context, html string) ([]models.ExtractedJobData, error) {
-	return parseJobListing(ctx, p.db, html)
+	if parseJobListing == nil {
+		return nil, errParserNotInitialized
+	}
+	return parseJobListing(ctx, html)
 }
 
 // parseJobListing is a placeholder that will be wired to the actual parser.
-// It's defined here to avoid importing internal packages.
-var parseJobListing func(ctx context.Context, db *sql.DB, html string) ([]models.ExtractedJobData, error)
+var parseJobListing func(ctx context.Context, html string) ([]models.ExtractedJobData, error)
 
 // SetParseJobListing sets the actual parser implementation.
-func SetParseJobListing(fn func(ctx context.Context, db *sql.DB, html string) ([]models.ExtractedJobData, error)) {
+func SetParseJobListing(fn func(ctx context.Context, html string) ([]models.ExtractedJobData, error)) {
 	parseJobListing = fn
 }
 

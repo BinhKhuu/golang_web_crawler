@@ -147,7 +147,7 @@ func (f *PlaywrightFetcher) FetchDefault(ctx context.Context, url string) ([]cra
 	// todo design a more consistent wait, can't use network idle because the app could be finished loading but there is ongoing network traffic
 	_, err = p.Goto(url, playwright.PageGotoOptions{
 		WaitUntil: playwright.WaitUntilStateDomcontentloaded,
-		Timeout:   playwright.Float(f.timeoutInMs()),
+		Timeout:   new(f.timeoutInMs()),
 	})
 	if err != nil {
 		return []crawler.FetchResult{}, err
@@ -203,7 +203,7 @@ func (f *PlaywrightFetcher) FetchSPAConfig(ctx context.Context, url string) ([]c
 		return []crawler.FetchResult{}, ctxErr
 	}
 	_, err = p.Goto(url, playwright.PageGotoOptions{
-		Timeout: playwright.Float(f.timeoutInMs()),
+		Timeout: new(f.timeoutInMs()),
 	})
 	if err != nil {
 		return []crawler.FetchResult{}, err
@@ -272,8 +272,8 @@ func collectPageResults(ctx context.Context, f *PlaywrightFetcher, p playwright.
 }
 
 func randomDelay(ctx context.Context) error {
-	const randValue = 1000
-	const randRange = 2000
+	const randValue = 500
+	const randRange = 1000
 	// #nosec G404 - math/rand is sufficient for network jitter
 	delay := time.Duration(randValue+rand.Intn(randRange)) * time.Millisecond
 	timer := time.NewTimer(delay)
@@ -319,7 +319,7 @@ func (f *PlaywrightFetcher) timeoutInMs() float64 {
 // invalid selectors.
 func (f *PlaywrightFetcher) clickWithTimeout(locator playwright.Locator) error {
 	return locator.Click(playwright.LocatorClickOptions{
-		Timeout: playwright.Float(f.timeoutInMs()),
+		Timeout: new(f.timeoutInMs()),
 	})
 }
 
@@ -359,7 +359,7 @@ func waitForElementVisibility(f *PlaywrightFetcher, p playwright.Page, sel strin
 	locator := p.Locator(sel)
 	err := locator.First().WaitFor(playwright.LocatorWaitForOptions{
 		State:   playwright.WaitForSelectorStateVisible,
-		Timeout: playwright.Float(f.timeoutInMs()),
+		Timeout: new(f.timeoutInMs()),
 	})
 	return err
 }
@@ -616,7 +616,7 @@ func (f *PlaywrightFetcher) waitForNextPageLoad(ctx context.Context, p playwrigh
 		locator := p.Locator(sel)
 		err := locator.First().WaitFor(playwright.LocatorWaitForOptions{
 			State:   playwright.WaitForSelectorStateVisible,
-			Timeout: playwright.Float(f.timeoutInMs()),
+			Timeout: new(f.timeoutInMs()),
 		})
 		if err == nil {
 			return nil
@@ -639,7 +639,7 @@ func (f *PlaywrightFetcher) configurePlaywrightBrowser() error {
 	}
 
 	b, err := pw.Chromium.Launch(playwright.BrowserTypeLaunchOptions{
-		Headless: playwright.Bool(headless),
+		Headless: new(headless),
 		Args: []string{
 			"--disable-blink-features=AutomationControlled",
 			"--disable-features=IsolateOrigins,site-per-process",
@@ -659,14 +659,14 @@ func (f *PlaywrightFetcher) configurePlaywrightBrowser() error {
 	const width = 1920
 	const height = 1080
 	ops := playwright.BrowserNewContextOptions{
-		UserAgent:         playwright.String("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"),
+		UserAgent:         new("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"),
 		Viewport:          &playwright.Size{Width: width, Height: height}, // Use ViewportSize pointer
-		Locale:            playwright.String("en-US"),
-		TimezoneId:        playwright.String("America/New_York"),
+		Locale:            new("en-US"),
+		TimezoneId:        new("America/New_York"),
 		Permissions:       []string{"geolocation", "notifications"}, // Add notifications to look more "human"
-		JavaScriptEnabled: playwright.Bool(true),
-		IgnoreHttpsErrors: playwright.Bool(true),
-		HasTouch:          playwright.Bool(false),
+		JavaScriptEnabled: new(true),
+		IgnoreHttpsErrors: new(true),
+		HasTouch:          new(false),
 	}
 
 	// 2. More comprehensive script injection
@@ -680,7 +680,7 @@ func (f *PlaywrightFetcher) configurePlaywrightBrowser() error {
 
 	// 3. Enhanced stealth scripts
 	err = bctx.AddInitScript(playwright.Script{
-		Content: playwright.String(`
+		Content: new(`
             // Remove webdriver property
             Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
             

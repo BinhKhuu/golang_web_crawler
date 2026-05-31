@@ -393,7 +393,10 @@ func TestNewParseJob(t *testing.T) {
 	stor := storage.NewService(mockDB, newTestLogger())
 	logger := newTestLogger()
 
-	j := newParseJob(stor, mockDB, logger)
+	j, err := newParseJob(stor, logger)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	if j == nil {
 		t.Fatal("expected non-nil ParseJob")

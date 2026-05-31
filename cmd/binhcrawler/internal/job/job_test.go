@@ -2,7 +2,6 @@ package job
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"golangwebcrawler/internal/models"
 	"golangwebcrawler/internal/storage"
@@ -171,7 +170,7 @@ func TestNewParseJob_NoData(t *testing.T) {
 
 	j := NewParseJob(&ParseConfig{
 		Storage:   mockStor,
-		ParserFn:  func() (ParserJob, error) { return &mockParser{}, nil },
+		Parser:    &mockParser{},
 		Logger:    slog.Default(),
 		StartDate: typeutil.UTCTimeNow(),
 	})
@@ -191,12 +190,10 @@ func TestNewParseJob_WithData(t *testing.T) {
 
 	j := NewParseJob(&ParseConfig{
 		Storage: mockStor,
-		ParserFn: func() (ParserJob, error) {
-			return &mockParser{
-				results: []models.ExtractedJobData{
-					{Title: "Engineer", Company: "ACME", Link: testJobURL + "/1"},
-				},
-			}, nil
+		Parser: &mockParser{
+			results: []models.ExtractedJobData{
+				{Title: "Engineer", Company: "ACME", Link: testJobURL + "/1"},
+			},
 		},
 		Logger:    slog.Default(),
 		StartDate: typeutil.UTCTimeNow(),
@@ -220,7 +217,7 @@ func TestNewParseJob_StorageError(t *testing.T) {
 
 	j := NewParseJob(&ParseConfig{
 		Storage:   mockStor,
-		ParserFn:  func() (ParserJob, error) { return &mockParser{}, nil },
+		Parser:    &mockParser{},
 		Logger:    slog.Default(),
 		StartDate: typeutil.UTCTimeNow(),
 	})
@@ -231,8 +228,7 @@ func TestNewParseJob_StorageError(t *testing.T) {
 	}
 }
 
-func TestNewParseJob_ParserCreationError(t *testing.T) {
-	expectedErr := errors.New("llm unavailable")
+func TestNewParseJob_NilParser(t *testing.T) {
 	mockStor := &mockStorage{
 		rawData: []storage.RawData{
 			{URL: testURL1, RawContent: "<html>job</html>"},
@@ -240,10 +236,8 @@ func TestNewParseJob_ParserCreationError(t *testing.T) {
 	}
 
 	j := NewParseJob(&ParseConfig{
-		Storage: mockStor,
-		ParserFn: func() (ParserJob, error) {
-			return nil, expectedErr
-		},
+		Storage:   mockStor,
+		Parser:    nil,
 		Logger:    slog.Default(),
 		StartDate: typeutil.UTCTimeNow(),
 	})
@@ -265,12 +259,10 @@ func TestNewParseJob_BatchStorage(t *testing.T) {
 
 	j := NewParseJob(&ParseConfig{
 		Storage: mockStor,
-		ParserFn: func() (ParserJob, error) {
-			return &mockParser{
-				results: []models.ExtractedJobData{
-					{Title: testTitle, Link: testJobURL},
-				},
-			}, nil
+		Parser: &mockParser{
+			results: []models.ExtractedJobData{
+				{Title: testTitle, Link: testJobURL},
+			},
 		},
 		Logger:    slog.Default(),
 		StartDate: typeutil.UTCTimeNow(),
@@ -298,12 +290,10 @@ func TestNewParseJob_ContextCancellation(t *testing.T) {
 
 	j := NewParseJob(&ParseConfig{
 		Storage: mockStor,
-		ParserFn: func() (ParserJob, error) {
-			return &mockParser{
-				results: []models.ExtractedJobData{
-					{Title: testTitle, Link: testJobURL},
-				},
-			}, nil
+		Parser: &mockParser{
+			results: []models.ExtractedJobData{
+				{Title: testTitle, Link: testJobURL},
+			},
 		},
 		Logger:    slog.Default(),
 		StartDate: typeutil.UTCTimeNow(),
@@ -328,27 +318,27 @@ func TestNewParseJob_ParseErrorContinues(t *testing.T) {
 	}
 
 	parseCall := 0
+	parser := &mockParser{
+		results: func() []models.ExtractedJobData {
+			parseCall++
+			if parseCall == 2 {
+				return nil
+			}
+			return []models.ExtractedJobData{
+				{Title: testTitle, Link: testJobURL},
+			}
+		}(),
+		err: func() error {
+			if parseCall == 2 {
+				return errors.New("parse failed")
+			}
+			return nil
+		}(),
+	}
+
 	j := NewParseJob(&ParseConfig{
-		Storage: mockStor,
-		ParserFn: func() (ParserJob, error) {
-			return &mockParser{
-				results: func() []models.ExtractedJobData {
-					parseCall++
-					if parseCall == 2 {
-						return nil
-					}
-					return []models.ExtractedJobData{
-						{Title: testTitle, Link: testJobURL},
-					}
-				}(),
-				err: func() error {
-					if parseCall == 2 {
-						return errors.New("parse failed")
-					}
-					return nil
-				}(),
-			}, nil
-		},
+		Storage:   mockStor,
+		Parser:    parser,
 		Logger:    slog.Default(),
 		StartDate: typeutil.UTCTimeNow(),
 		BatchSize: 100,
@@ -370,12 +360,10 @@ func TestNewParseJob_StoreFailureNoDelete(t *testing.T) {
 
 	j := NewParseJob(&ParseConfig{
 		Storage: mockStor,
-		ParserFn: func() (ParserJob, error) {
-			return &mockParser{
-				results: []models.ExtractedJobData{
-					{Title: testTitle, Link: testJobURL},
-				},
-			}, nil
+		Parser: &mockParser{
+			results: []models.ExtractedJobData{
+				{Title: testTitle, Link: testJobURL},
+			},
 		},
 		Logger:    slog.Default(),
 		StartDate: typeutil.UTCTimeNow(),
@@ -406,12 +394,10 @@ func TestNewParseJob_StoreSuccessDeletesRawData(t *testing.T) {
 
 	j := NewParseJob(&ParseConfig{
 		Storage: mockStor,
-		ParserFn: func() (ParserJob, error) {
-			return &mockParser{
-				results: []models.ExtractedJobData{
-					{Title: testTitle, Link: testJobURL},
-				},
-			}, nil
+		Parser: &mockParser{
+			results: []models.ExtractedJobData{
+				{Title: testTitle, Link: testJobURL},
+			},
 		},
 		Logger:    slog.Default(),
 		StartDate: typeutil.UTCTimeNow(),
@@ -443,12 +429,10 @@ func TestNewParseJob_BatchStoreFailureNoDelete(t *testing.T) {
 
 	j := NewParseJob(&ParseConfig{
 		Storage: mockStor,
-		ParserFn: func() (ParserJob, error) {
-			return &mockParser{
-				results: []models.ExtractedJobData{
-					{Title: testTitle, Link: testJobURL},
-				},
-			}, nil
+		Parser: &mockParser{
+			results: []models.ExtractedJobData{
+				{Title: testTitle, Link: testJobURL},
+			},
 		},
 		Logger:    slog.Default(),
 		StartDate: typeutil.UTCTimeNow(),
@@ -467,11 +451,11 @@ func TestNewParseJob_BatchStoreFailureNoDelete(t *testing.T) {
 
 func TestSetParseJobListing(t *testing.T) {
 	expectedErr := errors.New("not implemented")
-	SetParseJobListing(func(ctx context.Context, db *sql.DB, html string) ([]models.ExtractedJobData, error) {
+	SetParseJobListing(func(ctx context.Context, html string) ([]models.ExtractedJobData, error) {
 		return nil, expectedErr
 	})
 
-	p := &DBParser{db: nil}
+	p := &DBParser{}
 
 	_, err := p.ParseLLM(t.Context(), "<html>test</html>")
 	if err == nil {

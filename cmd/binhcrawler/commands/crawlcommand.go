@@ -10,6 +10,8 @@ import (
 	"golangwebcrawler/internal/crawler"
 	"golangwebcrawler/internal/dbstore"
 	"golangwebcrawler/internal/fetcher/playwrightfetcher"
+	"golangwebcrawler/internal/llm"
+	"golangwebcrawler/internal/parser"
 	"golangwebcrawler/internal/storage"
 	"golangwebcrawler/internal/typeutil"
 	"log/slog"
@@ -56,7 +58,6 @@ type CrawlCommand struct {
 func (c *CrawlCommand) Execute(_ []string) error {
 	c.Logger.Info("Starting crawl command")
 
-	// todo name _ db when its ready for use
 	db, dbErr := InitDb()
 	if dbErr != nil {
 		c.Logger.Error("error setting up database")
@@ -75,7 +76,6 @@ func (c *CrawlCommand) Execute(_ []string) error {
 		c.Logger.Error("failed to build playwright config", "error", pwErr)
 		return pwErr
 	}
-	// 4. Create CrawlJob with configured parameters
 	fetcher, fetchErr := playwrightfetcher.NewConfiguredPlaywrightFetcher(c.Logger, &pwConfig)
 	if fetchErr != nil {
 		c.Logger.Error("failed to create playwright fetcher", "error", fetchErr)
@@ -90,7 +90,11 @@ func (c *CrawlCommand) Execute(_ []string) error {
 	jobs := []job.Job{crawlJob}
 
 	if c.ParseAfter {
-		parseJob := newParseJob(storageSvc, db, c.Logger)
+		parseJob, parseErr := newParseJob(storageSvc, c.Logger)
+		if parseErr != nil {
+			c.Logger.Error("failed to create parser", "error", parseErr)
+			return fmt.Errorf("create parser: %w", parseErr)
+		}
 		jobs = append(jobs, parseJob)
 	}
 
@@ -141,15 +145,27 @@ func newCrawlJob(startURL string, fetcher crawler.Fetcher, stor *storage.Service
 
 const defaultBatchSize = 100
 
-func newParseJob(stor *storage.Service, db *sql.DB, logger *slog.Logger) *job.ParseJob {
+func newParseJob(stor *storage.Service, logger *slog.Logger) (*job.ParseJob, error) {
 	startTime := typeutil.UTCTimeNow().Add(-1 * time.Minute)
+
+	llmService, err := llm.NewLLMService()
+	if err != nil {
+		return nil, fmt.Errorf("create LLM service: %w", err)
+	}
+
+	rawParser := parser.NewJobListingParser(llmService)
+	p, ok := rawParser.(*parser.JobListingParser)
+	if !ok {
+		return nil, fmt.Errorf("expected *parser.JobListingParser, got %T", rawParser)
+	}
+
 	return job.NewParseJob(&job.ParseConfig{
 		Storage:   stor,
-		ParserFn:  job.NewDBParserCreator(db),
+		Parser:    p,
 		Logger:    logger,
 		StartDate: startTime,
 		BatchSize: defaultBatchSize,
-	})
+	}), nil
 }
 
 func parseMode(modeStr string) (orchestrator.Mode, error) {
