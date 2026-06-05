@@ -12,16 +12,20 @@ import (
 )
 
 const (
-	Model        = "gemma4"
+	Model        = "gemma4:e4b-mlx"
 	MaxMemoryMBs = 16384
 )
 
 var ErrNoJson = errors.New("no JSON block found in LLM response")
 
+type generator interface {
+	Generate(ctx context.Context, req *api.GenerateRequest, fn api.GenerateResponseFunc) error
+}
+
 type LLMService struct {
 	ModelName    string
 	maxMemoryMBs int
-	Client       *api.Client
+	Client       generator
 }
 
 func NewLLMService() (*LLMService, error) {
@@ -46,29 +50,9 @@ func initLLMConnection() (*api.Client, error) {
 	return client, nil
 }
 
-func (l *LLMService) QueryLLM(ctx context.Context, prompt string) ([]models.ExtractedJobData, error) {
-	req := &api.GenerateRequest{
-		Model:  l.ModelName,
-		Prompt: prompt,
-		Options: map[string]any{
-			"num_ctx": MaxMemoryMBs,
-		},
-		Stream: new(bool),
-	}
-
-	var fullResponse strings.Builder
-
-	err := l.Client.Generate(ctx, req, func(resp api.GenerateResponse) error {
-		fullResponse.WriteString(resp.Response)
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-
+func extractJSONFromResponse(response string) ([]models.ExtractedJobData, error) {
 	re := regexp.MustCompile("(?s)```json\n?(.*?)\n?```")
-	message := fullResponse.String()
-	match := re.FindStringSubmatch(message)
+	match := re.FindStringSubmatch(response)
 	if len(match) > 1 {
 		jsonStr := match[1]
 		raw := strings.TrimSpace(jsonStr)
@@ -93,4 +77,27 @@ func (l *LLMService) QueryLLM(ctx context.Context, prompt string) ([]models.Extr
 	}
 
 	return nil, ErrNoJson
+}
+
+func (l *LLMService) QueryLLM(ctx context.Context, prompt string) ([]models.ExtractedJobData, error) {
+	req := &api.GenerateRequest{
+		Model:  l.ModelName,
+		Prompt: prompt,
+		Options: map[string]any{
+			"num_ctx": MaxMemoryMBs,
+		},
+		Stream: new(bool),
+	}
+
+	var fullResponse strings.Builder
+
+	err := l.Client.Generate(ctx, req, func(resp api.GenerateResponse) error {
+		fullResponse.WriteString(resp.Response)
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return extractJSONFromResponse(fullResponse.String())
 }

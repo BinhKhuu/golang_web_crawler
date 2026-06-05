@@ -146,6 +146,8 @@ Integration tests are the developer's responsibility to run locally before mergi
    ollama list
    ```
 
+   on mac use gemma4:e2b-mlx
+
 ### Running Full Integration Tests
 
 Enable LLM and fetch tests via the environment variable:
