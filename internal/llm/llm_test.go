@@ -5,14 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"path/filepath"
-	"strings"
-	"testing"
-
 	"golangwebcrawler/internal/env"
 	"golangwebcrawler/internal/models"
 	"log"
 	"os"
+	"path/filepath"
+	"strings"
+	"testing"
 
 	"github.com/ollama/ollama/api"
 )
@@ -345,19 +344,10 @@ func Test_ParseJobDataLLM_FromFile(t *testing.T) {
 			// LLMs are non-deterministic and may produce malformed JSON on occasion.
 			// Retry up to 3 times to accommodate transient parsing failures.
 			const maxRetries = 3
-			var jobDetails []models.ExtractedJobData
-
-			for attempt := 1; attempt <= maxRetries; attempt++ {
-				jobDetails, err = llmService.QueryLLM(context.Background(), prompt)
-				if err == nil {
-					break
-				}
-				t.Logf("attempt %d/%d failed: %v", attempt, maxRetries, err)
-				if attempt == maxRetries {
-					t.Fatalf("LLM query failed after %d attempts: %v", maxRetries, err)
-				}
+			jobDetails, err := fetchJobDetailsWithRetry(t, maxRetries, llmService, prompt)
+			if err != nil {
+				t.Fatalf("failed to fetch job details after %d retries: %v", maxRetries, err)
 			}
-
 			if len(jobDetails) == 0 {
 				t.Fatalf("expected at least one job result, got none")
 			}
@@ -382,6 +372,22 @@ func Test_ParseJobDataLLM_FromFile(t *testing.T) {
 			}
 		})
 	}
+}
+
+func fetchJobDetailsWithRetry(t *testing.T, maxRetries int, llmService *LLMService, prompt string) ([]models.ExtractedJobData, error) {
+	var jobDetails []models.ExtractedJobData
+	var err error
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		jobDetails, err = llmService.QueryLLM(context.Background(), prompt)
+		if err == nil {
+			break
+		}
+		t.Logf("attempt %d/%d failed: %v", attempt, maxRetries, err)
+		if attempt == maxRetries {
+			t.Fatalf("LLM query failed after %d attempts: %v", maxRetries, err)
+		}
+	}
+	return jobDetails, err
 }
 
 func Test_ParseJobDataLLM_NoMatchReturnsError(t *testing.T) {
